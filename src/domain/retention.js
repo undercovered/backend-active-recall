@@ -39,7 +39,7 @@ function stabilityAfterSuccesses(successCount) {
  */
 function topicRetention({ learnedAt, recalls = [], today }) {
   const successful = [...recalls]
-    .filter((r) => r.correctAnswer === true)
+    .filter((r) => r.completed === true)
     .sort((a, b) =>
       String(toYmd(b.dateRecall)).localeCompare(String(toYmd(a.dateRecall))),
     );

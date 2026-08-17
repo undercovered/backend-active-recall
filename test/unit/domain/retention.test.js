@@ -38,7 +38,7 @@ describe('retention', () => {
 
   test('seven successful reviews lock retention at 100%', () => {
     const recalls = Array.from({ length: 7 }, (_, i) => ({
-      correctAnswer: true,
+      completed: true,
       dateRecall: `2026-0${i + 1}-01`,
     }));
     assert.equal(

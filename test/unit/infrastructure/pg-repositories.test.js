@@ -40,6 +40,7 @@ const flashcardRow = {
   id: 'f1',
   question: 'What?',
   topic_id: 't1',
+  subject_id: 's1',
   answer_type_id: 'at1',
   created_at: 1,
   updated_at: 2,
@@ -49,6 +50,8 @@ const answerRow = {
   answer_text: 'yes',
   is_correct: true,
   flashcard_id: 'f1',
+  topic_id: 't1',
+  subject_id: 's1',
   created_at: 1,
   updated_at: 2,
 };
@@ -143,7 +146,7 @@ describe('PgFlashcardRepository', () => {
     assert.equal((await repo.findByTopicId('t1'))[0].topicId, 't1');
     assert.equal((await repo.findById('f1')).answerTypeId, 'at1');
     assert.equal(
-      (await repo.create({ question: 'What?', topicId: 't1', answerTypeId: 'at1' })).id,
+      (await repo.create({ question: 'What?', topicId: 't1', subjectId: 's1', answerTypeId: 'at1' })).id,
       'f1',
     );
     assert.equal((await repo.update('f1', { question: 'Q' })).id, 'f1');
@@ -159,7 +162,13 @@ describe('PgAnswerRepository + PgAnswerTypeRepository', () => {
     assert.deepEqual(await repo.findByFlashcardIds([]), []);
     assert.equal((await repo.findByFlashcardIds(['f1']))[0].answerText, 'yes');
     assert.equal(
-      (await repo.create({ answerText: 'yes', isCorrect: true, flashcardId: 'f1' })).flashcardId,
+      (await repo.create({
+        answerText: 'yes',
+        isCorrect: true,
+        flashcardId: 'f1',
+        topicId: 't1',
+        subjectId: 's1',
+      })).flashcardId,
       'f1',
     );
   });
@@ -190,7 +199,7 @@ describe('PgActiveRecallRepository', () => {
           {
             id: 'r1',
             date_recall: '2026-08-16',
-            correct_answer: null,
+            completed: false,
             topic_id: 't1',
             topic_title: 'Loops',
             subject_id: 's1',
@@ -206,28 +215,30 @@ describe('PgActiveRecallRepository', () => {
     assert.equal((await repo.findById('r1')).topic_id, 't1');
   });
 
-  test('createMany inserts each item; markResult updates correct_answer', async () => {
+  test('createMany inserts each item; markCompleted sets completed', async () => {
     const pool = fakePool(() => ({
       rows: [
         {
           id: 'r1',
           date_recall: '2026-01-02',
-          correct_answer: null,
+          completed: false,
           topic_id: 't1',
+          subject_id: 's1',
         },
       ],
     }));
     const repo = new PgActiveRecallRepository(pool);
     const created = await repo.createMany([
-      { dateRecall: '2026-01-02', correctAnswer: null, topicId: 't1' },
+      { dateRecall: '2026-01-02', completed: false, topicId: 't1', subjectId: 's1' },
     ]);
     assert.equal(created[0].topicId, 't1');
-    const marked = await repo.markResult('r1', true);
-    assert.equal(pool.calls.at(-1).params[1], true);
+    assert.equal(created[0].completed, false);
+    const marked = await repo.markCompleted('r1');
+    assert.equal(pool.calls.at(-1).params[0], 'r1');
     assert.equal(marked.id, 'r1');
 
     const byTopic = await repo.findByTopicId('t1');
-    assert.equal(byTopic[0].correctAnswer, null);
+    assert.equal(byTopic[0].completed, false);
     const all = await repo.findAllForAliveTopics();
     assert.equal(all[0].topicId, 't1');
   });

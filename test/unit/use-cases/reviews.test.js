@@ -16,7 +16,7 @@ function reviewHarness(overrides = {}) {
   const recall = {
     id: 'rec-1',
     date_recall: '2026-08-16',
-    correct_answer: null,
+    completed: false,
     topic_id: 'top-1',
     topic_title: 'Loops',
     subject_id: 'sub-1',
@@ -27,11 +27,26 @@ function reviewHarness(overrides = {}) {
     id: 'fc-1',
     question: '2+2?',
     topicId: 'top-1',
+    subjectId: 'sub-1',
     answerTypeId: 'at-s',
   });
   const options = [
-    new Answer({ id: 'a-ok', answerText: '4', isCorrect: true, flashcardId: 'fc-1' }),
-    new Answer({ id: 'a-bad', answerText: '5', isCorrect: false, flashcardId: 'fc-1' }),
+    new Answer({
+      id: 'a-ok',
+      answerText: '4',
+      isCorrect: true,
+      flashcardId: 'fc-1',
+      topicId: 'top-1',
+      subjectId: 'sub-1',
+    }),
+    new Answer({
+      id: 'a-bad',
+      answerText: '5',
+      isCorrect: false,
+      flashcardId: 'fc-1',
+      topicId: 'top-1',
+      subjectId: 'sub-1',
+    }),
   ];
   const userAnswers = [];
   let marked = null;
@@ -55,9 +70,9 @@ function reviewHarness(overrides = {}) {
       async countDueOn() {
         return { count: 1, topicCount: 1 };
       },
-      async markResult(id, value) {
-        marked = { id, value };
-        recall.correct_answer = value;
+      async markCompleted(id) {
+        marked = { id, completed: true };
+        recall.completed = true;
         return recall;
       },
     },
@@ -211,11 +226,11 @@ describe('SubmitReviewAnswer', () => {
     });
     assert.equal(result.status, 'graded');
     assert.equal(result.isCorrect, true);
-    assert.equal(h.marked.value, true);
+    assert.equal(h.marked.completed, true);
     assert.ok(h.pool.client.queries.includes('COMMIT'));
   });
 
-  test('grades an incorrect single choice as false', async () => {
+  test('grades an incorrect single choice and still completes the recall', async () => {
     const h = reviewHarness();
     const result = await new SubmitReviewAnswer(h).execute({
       recallId: 'rec-1',
@@ -223,7 +238,7 @@ describe('SubmitReviewAnswer', () => {
       answerIds: ['a-bad'],
     });
     assert.equal(result.isCorrect, false);
-    assert.equal(h.marked.value, false);
+    assert.equal(h.marked.completed, true);
   });
 
   test('rejects a second answer on the same flashcard', async () => {
@@ -250,7 +265,7 @@ describe('SubmitReviewAnswer', () => {
   });
 
   test('rejects answering a recall that is already closed', async () => {
-    const h = reviewHarness({ recall: { correct_answer: false } });
+    const h = reviewHarness({ recall: { completed: true } });
     await assert.rejects(
       () =>
         new SubmitReviewAnswer(h).execute({
@@ -305,6 +320,7 @@ describe('SubmitReviewAnswer', () => {
       id: 'fc-2',
       question: '3+3?',
       topicId: 'top-1',
+      subjectId: 'sub-1',
       answerTypeId: 'at-s',
     });
     h.flashcardRepository.findByTopicId = async () => [h.flashcard, second];
@@ -373,6 +389,8 @@ describe('SubmitReviewAnswer', () => {
       answerText: 'also',
       isCorrect: true,
       flashcardId: 'fc-1',
+      topicId: 'top-1',
+      subjectId: 'sub-1',
     });
     const ok = await new SubmitReviewAnswer(h).execute({
       recallId: 'rec-1',
@@ -389,6 +407,8 @@ describe('SubmitReviewAnswer', () => {
       answerText: 'also',
       isCorrect: true,
       flashcardId: 'fc-1',
+      topicId: 'top-1',
+      subjectId: 'sub-1',
     });
     const miss = await new SubmitReviewAnswer(h2).execute({
       recallId: 'rec-1',
@@ -419,7 +439,28 @@ describe('GradeOpenAnswer', () => {
     });
     assert.equal(result.status, 'graded');
     assert.equal(result.isCorrect, true);
-    assert.equal(h.marked.value, true);
+    assert.equal(h.marked.completed, true);
+  });
+
+  test('incorrect self-grade still completes the recall', async () => {
+    const h = reviewHarness();
+    h.userAnswers.push(
+      new UserAnswer({
+        attemptId: 'rec-1',
+        flashcardId: 'fc-1',
+        openResponse: 'four',
+        isCorrect: null,
+        subjectId: 'sub-1',
+        topicId: 'top-1',
+      }),
+    );
+    const result = await new GradeOpenAnswer(h).execute({
+      recallId: 'rec-1',
+      flashcardId: 'fc-1',
+      isCorrect: false,
+    });
+    assert.equal(result.isCorrect, false);
+    assert.equal(h.marked.completed, true);
   });
 
   test('requires a boolean and a previously submitted open answer', async () => {

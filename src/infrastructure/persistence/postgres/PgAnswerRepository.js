@@ -30,12 +30,15 @@ class PgAnswerRepository extends AnswerRepository {
     return rows.map(Answer.fromRow);
   }
 
-  async create({ answerText, isCorrect = false, flashcardId }, client) {
+  async create(
+    { answerText, isCorrect = false, flashcardId, topicId, subjectId },
+    client,
+  ) {
     const { rows } = await this.db(client).query(
-      `INSERT INTO answers (answer_text, is_correct, flashcard_id)
-       VALUES ($1, $2, $3)
+      `INSERT INTO answers (answer_text, is_correct, flashcard_id, topic_id, subject_id)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [answerText, isCorrect, flashcardId],
+      [answerText, isCorrect, flashcardId, topicId, subjectId],
     );
     return Answer.fromRow(rows[0]);
   }

@@ -76,6 +76,7 @@ const createTopic = new CreateTopic({
 const getAllTopics = new GetAllTopics({ topicRepository });
 const getTopicById = new GetTopicById({
   topicRepository,
+  subjectRepository,
   flashcardRepository,
   answerRepository,
   answerTypeRepository,

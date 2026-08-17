@@ -23,8 +23,8 @@ class ActiveRecallRepository {
     throw new Error('ActiveRecallRepository.findById() not implemented.');
   }
 
-  async markResult(id, correctAnswer, client) {
-    throw new Error('ActiveRecallRepository.markResult() not implemented.');
+  async markCompleted(id, client) {
+    throw new Error('ActiveRecallRepository.markCompleted() not implemented.');
   }
 }
 

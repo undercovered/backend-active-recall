@@ -86,27 +86,19 @@ class PgSubjectRepository extends SubjectRepository {
     await this.pool.query(
       `UPDATE flashcards
        SET deleted = true
-       WHERE deleted = false
-         AND topic_id IN (SELECT id FROM topics WHERE subject_id = $1)`,
+       WHERE subject_id = $1 AND deleted = false`,
       [id],
     );
     await this.pool.query(
       `UPDATE answers
        SET deleted = true
-       WHERE deleted = false
-         AND flashcard_id IN (
-           SELECT f.id
-           FROM flashcards f
-           JOIN topics t ON t.id = f.topic_id
-           WHERE t.subject_id = $1
-         )`,
+       WHERE subject_id = $1 AND deleted = false`,
       [id],
     );
     await this.pool.query(
       `UPDATE active_recall
        SET deleted = true
-       WHERE deleted = false
-         AND topic_id IN (SELECT id FROM topics WHERE subject_id = $1)`,
+       WHERE subject_id = $1 AND deleted = false`,
       [id],
     );
     await this.pool.query(

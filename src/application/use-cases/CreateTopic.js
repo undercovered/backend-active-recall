@@ -101,6 +101,7 @@ class CreateTopic {
           {
             question: item.question,
             topicId: topic.id,
+            subjectId: topic.subjectId,
             answerTypeId: item.answerType.id,
           },
           client,
@@ -114,6 +115,8 @@ class CreateTopic {
                 answerText: option.answerText,
                 isCorrect: option.isCorrect,
                 flashcardId: flashcard.id,
+                topicId: topic.id,
+                subjectId: topic.subjectId,
               },
               client,
             ),
@@ -130,8 +133,9 @@ class CreateTopic {
       const recalls = await this.activeRecallRepository.createMany(
         buildRecallDates(new Date()).map((dateRecall) => ({
           dateRecall,
-          correctAnswer: null,
+          completed: false,
           topicId: topic.id,
+          subjectId: topic.subjectId,
         })),
         client,
       );

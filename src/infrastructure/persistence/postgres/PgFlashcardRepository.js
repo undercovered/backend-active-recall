@@ -19,7 +19,12 @@ class PgFlashcardRepository extends FlashcardRepository {
 
   async findAll() {
     const { rows } = await this.pool.query(
-      'SELECT * FROM flashcards WHERE deleted = false ORDER BY created_at DESC',
+      `SELECT f.*
+       FROM flashcards f
+       JOIN topics t ON t.id = f.topic_id AND t.deleted = false
+       JOIN subjects s ON s.id = f.subject_id AND s.deleted = false
+       WHERE f.deleted = false
+       ORDER BY f.created_at DESC`,
     );
     return rows.map(Flashcard.fromRow);
   }
@@ -40,6 +45,8 @@ class PgFlashcardRepository extends FlashcardRepository {
       `SELECT f.*, at.code AS answer_type_code, at.name AS answer_type_name
        FROM flashcards f
        JOIN answer_types at ON at.id = f.answer_type_id AND at.deleted = false
+       JOIN topics t ON t.id = f.topic_id AND t.deleted = false
+       JOIN subjects s ON s.id = f.subject_id AND s.deleted = false
        WHERE f.topic_id = ANY($1::uuid[])
          AND f.deleted = false
        ORDER BY f.created_at ASC`,
@@ -50,18 +57,22 @@ class PgFlashcardRepository extends FlashcardRepository {
 
   async findById(id) {
     const { rows } = await this.pool.query(
-      'SELECT * FROM flashcards WHERE id = $1 AND deleted = false',
+      `SELECT f.*
+       FROM flashcards f
+       JOIN topics t ON t.id = f.topic_id AND t.deleted = false
+       JOIN subjects s ON s.id = f.subject_id AND s.deleted = false
+       WHERE f.id = $1 AND f.deleted = false`,
       [id],
     );
     return rows[0] ? Flashcard.fromRow(rows[0]) : null;
   }
 
-  async create({ question, topicId, answerTypeId }, client) {
+  async create({ question, topicId, subjectId, answerTypeId }, client) {
     const { rows } = await this.db(client).query(
-      `INSERT INTO flashcards (question, topic_id, answer_type_id)
-       VALUES ($1, $2, $3)
+      `INSERT INTO flashcards (question, topic_id, subject_id, answer_type_id)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [question, topicId, answerTypeId],
+      [question, topicId, subjectId, answerTypeId],
     );
     return Flashcard.fromRow(rows[0]);
   }

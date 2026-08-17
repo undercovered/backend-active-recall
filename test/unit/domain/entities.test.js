@@ -65,10 +65,11 @@ describe('Topic entity', () => {
 });
 
 describe('Flashcard entity', () => {
-  test('requires question, topicId and answerTypeId', () => {
-    assert.throws(() => new Flashcard({ topicId: 't', answerTypeId: 'a' }), ValidationError);
-    assert.throws(() => new Flashcard({ question: 'Q', answerTypeId: 'a' }), ValidationError);
-    assert.throws(() => new Flashcard({ question: 'Q', topicId: 't' }), ValidationError);
+  test('requires question, topicId, subjectId and answerTypeId', () => {
+    assert.throws(() => new Flashcard({ topicId: 't', subjectId: 's', answerTypeId: 'a' }), ValidationError);
+    assert.throws(() => new Flashcard({ question: 'Q', subjectId: 's', answerTypeId: 'a' }), ValidationError);
+    assert.throws(() => new Flashcard({ question: 'Q', topicId: 't', answerTypeId: 'a' }), ValidationError);
+    assert.throws(() => new Flashcard({ question: 'Q', topicId: 't', subjectId: 's' }), ValidationError);
   });
 
   test('fromRow maps FKs', () => {
@@ -76,11 +77,13 @@ describe('Flashcard entity', () => {
       id: 'f1',
       question: 'What?',
       topic_id: 't1',
+      subject_id: 's1',
       answer_type_id: 'at1',
       created_at: 1,
       updated_at: 2,
     });
     assert.equal(f.topicId, 't1');
+    assert.equal(f.subjectId, 's1');
     assert.equal(f.answerTypeId, 'at1');
     assert.equal(f.toJSON().question, 'What?');
   });
@@ -88,8 +91,12 @@ describe('Flashcard entity', () => {
 
 describe('Answer entity', () => {
   test('requires answerText and flashcardId', () => {
-    assert.throws(() => new Answer({ flashcardId: 'f' }), ValidationError);
+    assert.throws(() => new Answer({ flashcardId: 'f', topicId: 't', subjectId: 's' }), ValidationError);
     assert.throws(() => new Answer({ answerText: 'yes' }), ValidationError);
+    assert.throws(
+      () => new Answer({ answerText: 'yes', flashcardId: 'f' }),
+      ValidationError,
+    );
   });
 
   test('coerces isCorrect to boolean', () => {
@@ -98,10 +105,13 @@ describe('Answer entity', () => {
       answer_text: '  yes ',
       is_correct: true,
       flashcard_id: 'f1',
+      topic_id: 't1',
+      subject_id: 's1',
     });
     assert.equal(a.answerText, 'yes');
     assert.equal(a.isCorrect, true);
     assert.equal(a.toJSON().flashcardId, 'f1');
+    assert.equal(a.toJSON().subjectId, 's1');
   });
 });
 
@@ -119,19 +129,34 @@ describe('AnswerType entity', () => {
 
 describe('ActiveRecall entity', () => {
   test('requires dateRecall and topicId', () => {
-    assert.throws(() => new ActiveRecall({ topicId: 't' }), ValidationError);
+    assert.throws(() => new ActiveRecall({ topicId: 't', subjectId: 's' }), ValidationError);
     assert.throws(() => new ActiveRecall({ dateRecall: new Date() }), ValidationError);
+    assert.throws(
+      () => new ActiveRecall({ dateRecall: new Date(), topicId: 't' }),
+      ValidationError,
+    );
   });
 
-  test('fromRow maps correct_answer which may be null', () => {
+  test('fromRow maps completed and defaults missing values to false', () => {
     const r = ActiveRecall.fromRow({
       id: 'r1',
       date_recall: '2026-01-01',
-      correct_answer: null,
+      completed: false,
       topic_id: 't1',
+      subject_id: 's1',
     });
-    assert.equal(r.correctAnswer, null);
+    assert.equal(r.completed, false);
     assert.equal(r.toJSON().topicId, 't1');
+    assert.equal(r.toJSON().subjectId, 's1');
+    assert.equal(
+      ActiveRecall.fromRow({
+        id: 'r2',
+        date_recall: '2026-01-01',
+        topic_id: 't1',
+        subject_id: 's1',
+      }).completed,
+      false,
+    );
   });
 });
 

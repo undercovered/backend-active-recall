@@ -26,7 +26,7 @@ class GradeOpenAnswer {
     if (!recall) {
       throw new NotFoundError('Repaso no encontrado.');
     }
-    if (recall.correct_answer !== null) {
+    if (recall.completed) {
       throw new ValidationError(
         'Este tema ya fue respondido. Podrás volver a intentarlo en el próximo repaso.',
       );
@@ -68,8 +68,7 @@ class GradeOpenAnswer {
         }
       }
       if (cards.length && cards.every((c) => graded.has(c.id))) {
-        const allCorrect = cards.every((c) => graded.get(c.id) === true);
-        await this.activeRecallRepository.markResult(recall.id, allCorrect, client);
+        await this.activeRecallRepository.markCompleted(recall.id, client);
       }
 
       await client.query('COMMIT');

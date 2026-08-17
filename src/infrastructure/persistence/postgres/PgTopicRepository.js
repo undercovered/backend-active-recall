@@ -20,20 +20,24 @@ class PgTopicRepository extends TopicRepository {
 
   async findAll({ search, subjectId } = {}) {
     const term = typeof search === 'string' ? search.trim() : '';
-    const clauses = ['deleted = false'];
+    const clauses = ['t.deleted = false', 's.deleted = false'];
     const values = [];
 
     if (subjectId) {
       values.push(subjectId);
-      clauses.push(`subject_id = $${values.length}`);
+      clauses.push(`t.subject_id = $${values.length}`);
     }
     if (term) {
       values.push(`%${term}%`);
-      clauses.push(`title ILIKE $${values.length}`);
+      clauses.push(`t.title ILIKE $${values.length}`);
     }
 
     const { rows } = await this.pool.query(
-      `SELECT * FROM topics WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC`,
+      `SELECT t.*
+       FROM topics t
+       JOIN subjects s ON s.id = t.subject_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY t.created_at DESC`,
       values,
     );
     return rows.map(Topic.fromRow);
@@ -45,7 +49,10 @@ class PgTopicRepository extends TopicRepository {
 
   async findById(id) {
     const { rows } = await this.pool.query(
-      'SELECT * FROM topics WHERE id = $1 AND deleted = false',
+      `SELECT t.*
+       FROM topics t
+       JOIN subjects s ON s.id = t.subject_id AND s.deleted = false
+       WHERE t.id = $1 AND t.deleted = false`,
       [id],
     );
     return rows[0] ? Topic.fromRow(rows[0]) : null;
@@ -94,8 +101,7 @@ class PgTopicRepository extends TopicRepository {
     await this.pool.query(
       `UPDATE answers
        SET deleted = true
-       WHERE deleted = false
-         AND flashcard_id IN (SELECT id FROM flashcards WHERE topic_id = $1)`,
+       WHERE topic_id = $1 AND deleted = false`,
       [id],
     );
     await this.pool.query(

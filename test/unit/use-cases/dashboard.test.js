@@ -32,8 +32,8 @@ describe('GetDashboardStats', () => {
       createdAt: '2026-08-10',
     });
     await repos.activeRecallRepository.createMany([
-      { dateRecall: '2026-08-17', topicId: fresh.id },
-      { dateRecall: '2026-08-18', topicId: older.id },
+      { dateRecall: '2026-08-17', topicId: fresh.id, subjectId: subject.id },
+      { dateRecall: '2026-08-18', topicId: older.id, subjectId: subject.id },
     ]);
 
     const stats = await new GetDashboardStats(repos).execute({ date: '2026-08-17' });

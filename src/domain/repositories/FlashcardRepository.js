@@ -29,7 +29,7 @@ class FlashcardRepository {
   }
 
   /**
-   * @param {{ question: string, topicId: string, answerTypeId: string }} data
+   * @param {{ question: string, topicId: string, subjectId: string, answerTypeId: string }} data
    * @returns {Promise<import('../entities/Flashcard')>}
    */
   async create(data, client) {

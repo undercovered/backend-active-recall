@@ -3,6 +3,7 @@
  * Mirrors the `flashcards` table and enforces its business rules:
  *   - question is required and must not be blank.
  *   - topicId is required (FK to topics.id).
+ *   - subjectId is required (FK to subjects.id, denormalized).
  *   - answerTypeId is required (FK to answer_types.id).
  */
 const ValidationError = require('../errors/ValidationError');
@@ -14,6 +15,7 @@ class Flashcard {
    * @param {string} [params.id]
    * @param {string} params.question
    * @param {string} params.topicId
+   * @param {string} params.subjectId
    * @param {string} params.answerTypeId
    * @param {Date|string} [params.createdAt]
    * @param {Date|string} [params.updatedAt]
@@ -22,6 +24,7 @@ class Flashcard {
     id,
     question,
     topicId,
+    subjectId,
     answerTypeId,
     deleted = false,
     createdAt,
@@ -35,6 +38,9 @@ class Flashcard {
     if (!topicId) {
       throw new ValidationError('Flashcard.topicId is required.');
     }
+    if (!subjectId) {
+      throw new ValidationError('Flashcard.subjectId is required.');
+    }
     if (!answerTypeId) {
       throw new ValidationError('Flashcard.answerTypeId is required.');
     }
@@ -42,6 +48,7 @@ class Flashcard {
     this.id = id;
     this.question = String(question).trim();
     this.topicId = topicId;
+    this.subjectId = subjectId;
     this.answerTypeId = answerTypeId;
     this.deleted = asDeleted(deleted);
     this.createdAt = createdAt;
@@ -58,6 +65,7 @@ class Flashcard {
       id: row.id,
       question: row.question,
       topicId: row.topic_id,
+      subjectId: row.subject_id,
       answerTypeId: row.answer_type_id,
       deleted: row.deleted,
       createdAt: row.created_at,
@@ -73,6 +81,7 @@ class Flashcard {
       id: this.id,
       question: this.question,
       topicId: this.topicId,
+      subjectId: this.subjectId,
       answerTypeId: this.answerTypeId,
       deleted: this.deleted,
       createdAt: this.createdAt,

@@ -6,12 +6,14 @@ const NotFoundError = require('../../domain/errors/NotFoundError');
 class GetTopicById {
   constructor({
     topicRepository,
+    subjectRepository,
     flashcardRepository,
     answerRepository,
     answerTypeRepository,
     activeRecallRepository,
   }) {
     this.topicRepository = topicRepository;
+    this.subjectRepository = subjectRepository;
     this.flashcardRepository = flashcardRepository;
     this.answerRepository = answerRepository;
     this.answerTypeRepository = answerTypeRepository;
@@ -21,6 +23,11 @@ class GetTopicById {
   async execute(id) {
     const topic = await this.topicRepository.findById(id);
     if (!topic) {
+      throw new NotFoundError('Tema no encontrado.');
+    }
+
+    const subject = await this.subjectRepository.findById(topic.subjectId);
+    if (!subject) {
       throw new NotFoundError('Tema no encontrado.');
     }
 

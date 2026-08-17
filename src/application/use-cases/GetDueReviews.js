@@ -2,7 +2,7 @@ const { resolveReviewDate } = require('../../domain/reviewDate');
 
 /**
  * How many reviews are due on (or before) the given local date
- * and have not been answered yet (correct_answer IS NULL).
+ * and have not been finished yet (completed = false).
  */
 class GetDueReviews {
   constructor({ activeRecallRepository }) {

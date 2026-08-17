@@ -66,22 +66,26 @@ function createMemoryRepos() {
       const subject = subjects.find((s) => s.id === sid && alive(s));
       if (!subject) return false;
       subject.deleted = true;
-      for (const topic of topics.filter((t) => t.subjectId === sid && alive(t))) {
-        topic.deleted = true;
-        for (const card of flashcards.filter((f) => f.topicId === topic.id && alive(f))) {
-          card.deleted = true;
-          answers
-            .filter((a) => a.flashcardId === card.id && alive(a))
-            .forEach((a) => {
-              a.deleted = true;
-            });
-        }
-        recalls
-          .filter((r) => r.topicId === topic.id && alive(r))
-          .forEach((r) => {
-            r.deleted = true;
-          });
-      }
+      topics
+        .filter((t) => t.subjectId === sid && alive(t))
+        .forEach((t) => {
+          t.deleted = true;
+        });
+      flashcards
+        .filter((f) => f.subjectId === sid && alive(f))
+        .forEach((f) => {
+          f.deleted = true;
+        });
+      answers
+        .filter((a) => a.subjectId === sid && alive(a))
+        .forEach((a) => {
+          a.deleted = true;
+        });
+      recalls
+        .filter((r) => r.subjectId === sid && alive(r))
+        .forEach((r) => {
+          r.deleted = true;
+        });
       userAnswers
         .filter((u) => u.subjectId === sid && alive(u))
         .forEach((u) => {
@@ -96,6 +100,8 @@ function createMemoryRepos() {
       const term = (search || '').trim().toLowerCase();
       return topics.filter((t) => {
         if (!alive(t)) return false;
+        const subject = subjects.find((s) => s.id === t.subjectId && alive(s));
+        if (!subject) return false;
         if (subjectId && t.subjectId !== subjectId) return false;
         if (term && !t.title.toLowerCase().includes(term)) return false;
         return true;
@@ -105,7 +111,10 @@ function createMemoryRepos() {
       return this.findAll({ subjectId });
     },
     async findById(tid) {
-      return topics.find((t) => t.id === tid && alive(t)) ?? null;
+      const topic = topics.find((t) => t.id === tid && alive(t));
+      if (!topic) return null;
+      const subject = subjects.find((s) => s.id === topic.subjectId && alive(s));
+      return subject ? topic : null;
     },
     async create(data) {
       const t = new Topic({ id: id('top', topics), ...data });
@@ -123,14 +132,16 @@ function createMemoryRepos() {
       const topic = topics.find((t) => t.id === tid && alive(t));
       if (!topic) return false;
       topic.deleted = true;
-      for (const card of flashcards.filter((f) => f.topicId === tid && alive(f))) {
-        card.deleted = true;
-        answers
-          .filter((a) => a.flashcardId === card.id && alive(a))
-          .forEach((a) => {
-            a.deleted = true;
-          });
-      }
+      flashcards
+        .filter((f) => f.topicId === tid && alive(f))
+        .forEach((f) => {
+          f.deleted = true;
+        });
+      answers
+        .filter((a) => a.topicId === tid && alive(a))
+        .forEach((a) => {
+          a.deleted = true;
+        });
       recalls
         .filter((r) => r.topicId === tid && alive(r))
         .forEach((r) => {
@@ -145,16 +156,22 @@ function createMemoryRepos() {
     },
   };
 
+  function topicTreeAlive(topicId) {
+    const topic = topics.find((t) => t.id === topicId && alive(t));
+    if (!topic) return false;
+    return subjects.some((s) => s.id === topic.subjectId && alive(s));
+  }
+
   const flashcardRepository = {
     async findAll() {
-      return flashcards.filter(alive);
+      return flashcards.filter((f) => alive(f) && topicTreeAlive(f.topicId));
     },
     async findByTopicId(topicId) {
       return flashcards.filter((f) => f.topicId === topicId && alive(f));
     },
     async findByTopicIds(topicIds) {
       return flashcards
-        .filter((f) => topicIds.includes(f.topicId) && alive(f))
+        .filter((f) => topicIds.includes(f.topicId) && alive(f) && topicTreeAlive(f.topicId))
         .map((f) => {
           const type = answerTypes.find((t) => t.id === f.answerTypeId);
           return {
@@ -168,7 +185,9 @@ function createMemoryRepos() {
         });
     },
     async findById(fid) {
-      return flashcards.find((f) => f.id === fid && alive(f)) ?? null;
+      const card = flashcards.find((f) => f.id === fid && alive(f));
+      if (!card || !topicTreeAlive(card.topicId)) return null;
+      return card;
     },
     async create(data) {
       const f = new Flashcard({ id: id('fc', flashcards), ...data });
@@ -238,8 +257,9 @@ function createMemoryRepos() {
           new ActiveRecall({
             id: `ar-${recalls.length + i + 1}`,
             dateRecall: item.dateRecall,
-            correctAnswer: item.correctAnswer ?? null,
+            completed: item.completed === true,
             topicId: item.topicId,
+            subjectId: item.subjectId,
           }),
       );
       recalls.push(...created);
@@ -247,7 +267,7 @@ function createMemoryRepos() {
     },
     async countDueOn(date) {
       const due = recalls.filter((r) => {
-        if (!alive(r) || r.correctAnswer !== null) return false;
+        if (!alive(r) || r.completed) return false;
         const topic = topics.find((t) => t.id === r.topicId && alive(t));
         const subject = subjects.find((s) => s.id === topic?.subjectId && alive(s));
         return Boolean(topic && subject && localDate(r.dateRecall) <= date);
@@ -258,7 +278,7 @@ function createMemoryRepos() {
     async findDueOn(date) {
       const byTopic = new Map();
       for (const r of recalls) {
-        if (!alive(r) || r.correctAnswer !== null) continue;
+        if (!alive(r) || r.completed) continue;
         if (localDate(r.dateRecall) > date) continue;
         const topic = topics.find((t) => t.id === r.topicId && alive(t));
         const subject = subjects.find((s) => s.id === topic?.subjectId && alive(s));
@@ -274,7 +294,7 @@ function createMemoryRepos() {
         return {
           id: r.id,
           date_recall: localDate(r.dateRecall),
-          correct_answer: r.correctAnswer,
+          completed: r.completed,
           topic_id: r.topicId,
           topic_title: topic?.title,
           subject_id: topic?.subjectId,
@@ -291,17 +311,17 @@ function createMemoryRepos() {
       return {
         id: r.id,
         date_recall: localDate(r.dateRecall),
-        correct_answer: r.correctAnswer,
+        completed: r.completed,
         topic_id: r.topicId,
         topic_title: topic?.title,
         subject_id: topic?.subjectId,
         subject_title: subject?.title,
       };
     },
-    async markResult(rid, value) {
+    async markCompleted(rid) {
       const r = recalls.find((x) => x.id === rid && alive(x));
       if (!r) return null;
-      r.correctAnswer = value;
+      r.completed = true;
       return r;
     },
     /** Test helper: make the earliest recall of a topic due today. */

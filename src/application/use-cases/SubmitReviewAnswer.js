@@ -36,7 +36,7 @@ class SubmitReviewAnswer {
     if (!recall) {
       throw new NotFoundError('Repaso no encontrado.');
     }
-    if (recall.correct_answer !== null) {
+    if (recall.completed) {
       throw new ValidationError(
         'Este tema ya fue respondido. Podrás volver a intentarlo en el próximo repaso.',
       );
@@ -195,8 +195,7 @@ class SubmitReviewAnswer {
     if (!cards.length || cards.some((c) => !graded.has(c.id))) {
       return;
     }
-    const allCorrect = cards.every((c) => graded.get(c.id) === true);
-    await this.activeRecallRepository.markResult(recall.id, allCorrect, client);
+    await this.activeRecallRepository.markCompleted(recall.id, client);
   }
 }
 

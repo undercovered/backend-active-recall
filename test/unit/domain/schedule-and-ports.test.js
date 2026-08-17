@@ -104,7 +104,7 @@ describe('repository ports throw until implemented', () => {
     await assert.rejects(() => ar.countDueOn('2026-01-01'));
     await assert.rejects(() => ar.findDueOn('2026-01-01'));
     await assert.rejects(() => ar.findById('x'));
-    await assert.rejects(() => ar.markResult('x', true));
+    await assert.rejects(() => ar.markCompleted('x'));
 
     const ua = new UserAnswerRepository();
     await assert.rejects(() => ua.findByAttemptId('a'));

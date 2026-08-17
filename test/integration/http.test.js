@@ -139,7 +139,9 @@ describe('HTTP integration — topics and answer types', () => {
     assert.equal(created.status, 201);
     assert.equal(created.body.data.flashcards.length, 2);
     assert.equal(created.body.data.recalls.length, 7);
-    assert.ok(created.body.data.recalls.every((r) => r.correctAnswer === null));
+    assert.ok(created.body.data.recalls.every((r) => r.completed === false));
+    assert.ok(created.body.data.flashcards.every((f) => f.subjectId === subjectId));
+    assert.ok(created.body.data.recalls.every((r) => r.subjectId === subjectId));
     const topicId = created.body.data.id;
 
     const listed = await request(app, {
@@ -207,6 +209,56 @@ describe('HTTP integration — topics and answer types', () => {
     assert.equal(res.status, 201);
     assert.equal(res.body.data.flashcards.length, 1);
     assert.equal(repos.recalls.length, 7);
+  });
+
+  test('deleting a subject hides its topics, questions and due reviews', async () => {
+    const subjectId = await seedSubject();
+    const created = await request(app, {
+      method: 'POST',
+      path: '/api/topics',
+      body: {
+        title: 'Loops',
+        subjectId,
+        questions: [
+          {
+            question: 'What is a for?',
+            answerTypeCode: 'open_answer',
+            answers: [{ answerText: 'repeating' }],
+          },
+        ],
+      },
+    });
+    const topicId = created.body.data.id;
+    repos.activeRecallRepository.makeDueToday(topicId, todayIso());
+
+    const dueBefore = await request(app, {
+      path: `/api/reviews/due-today?date=${todayIso()}`,
+    });
+    assert.equal(dueBefore.body.data.hasPending, true);
+
+    const removed = await request(app, {
+      method: 'DELETE',
+      path: `/api/subjects/${subjectId}`,
+    });
+    assert.equal(removed.status, 200);
+
+    const topic = await request(app, { path: `/api/topics/${topicId}` });
+    assert.equal(topic.status, 404);
+
+    const listed = await request(app, {
+      path: `/api/topics?subjectId=${subjectId}`,
+    });
+    assert.equal(listed.body.data.length, 0);
+
+    const dueAfter = await request(app, {
+      path: `/api/reviews/due-today?date=${todayIso()}`,
+    });
+    assert.equal(dueAfter.body.data.hasPending, false);
+
+    const session = await request(app, {
+      path: `/api/reviews/session?date=${todayIso()}`,
+    });
+    assert.deepEqual(session.body.data.subjects, []);
   });
 });
 

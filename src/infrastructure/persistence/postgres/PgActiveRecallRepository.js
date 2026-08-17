@@ -24,7 +24,7 @@ class PgActiveRecallRepository extends ActiveRecallRepository {
       `SELECT ar.*
        FROM active_recall ar
        JOIN topics t ON t.id = ar.topic_id AND t.deleted = false
-       JOIN subjects s ON s.id = t.subject_id AND s.deleted = false
+       JOIN subjects s ON s.id = ar.subject_id AND s.deleted = false
        WHERE ar.deleted = false
        ORDER BY ar.topic_id, ar.date_recall ASC`,
     );
@@ -35,10 +35,10 @@ class PgActiveRecallRepository extends ActiveRecallRepository {
     const created = [];
     for (const item of items) {
       const { rows } = await this.db(client).query(
-        `INSERT INTO active_recall (date_recall, correct_answer, topic_id)
-         VALUES ($1, $2, $3)
+        `INSERT INTO active_recall (date_recall, completed, topic_id, subject_id)
+         VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [item.dateRecall, item.correctAnswer ?? null, item.topicId],
+        [item.dateRecall, item.completed === true, item.topicId, item.subjectId],
       );
       created.push(ActiveRecall.fromRow(rows[0]));
     }
@@ -52,9 +52,9 @@ class PgActiveRecallRepository extends ActiveRecallRepository {
          COUNT(DISTINCT ar.topic_id)::int AS topic_count
        FROM active_recall ar
        JOIN topics t ON t.id = ar.topic_id AND t.deleted = false
-       JOIN subjects s ON s.id = t.subject_id AND s.deleted = false
+       JOIN subjects s ON s.id = ar.subject_id AND s.deleted = false
        WHERE ar.deleted = false
-         AND ar.correct_answer IS NULL
+         AND ar.completed = false
          AND ar.date_recall::date <= $1::date`,
       [date],
     );
@@ -65,23 +65,23 @@ class PgActiveRecallRepository extends ActiveRecallRepository {
   }
 
   /**
-   * Earliest ungraded recall per topic that is due on or before `date`.
+   * Earliest unfinished recall per topic that is due on or before `date`.
    */
   async findDueOn(date) {
     const { rows } = await this.pool.query(
       `SELECT DISTINCT ON (ar.topic_id)
          ar.id,
          ar.date_recall,
-         ar.correct_answer,
+         ar.completed,
          ar.topic_id,
          t.title AS topic_title,
          t.subject_id,
          s.title AS subject_title
        FROM active_recall ar
        JOIN topics t ON t.id = ar.topic_id AND t.deleted = false
-       JOIN subjects s ON s.id = t.subject_id AND s.deleted = false
+       JOIN subjects s ON s.id = ar.subject_id AND s.deleted = false
        WHERE ar.deleted = false
-         AND ar.correct_answer IS NULL
+         AND ar.completed = false
          AND ar.date_recall::date <= $1::date
        ORDER BY ar.topic_id, ar.date_recall ASC`,
       [date],
@@ -94,28 +94,28 @@ class PgActiveRecallRepository extends ActiveRecallRepository {
       `SELECT
          ar.id,
          ar.date_recall,
-         ar.correct_answer,
+         ar.completed,
          ar.topic_id,
          t.title AS topic_title,
          t.subject_id,
          s.title AS subject_title
        FROM active_recall ar
        JOIN topics t ON t.id = ar.topic_id AND t.deleted = false
-       JOIN subjects s ON s.id = t.subject_id AND s.deleted = false
+       JOIN subjects s ON s.id = ar.subject_id AND s.deleted = false
        WHERE ar.id = $1 AND ar.deleted = false`,
       [id],
     );
     return rows[0] ?? null;
   }
 
-  async markResult(id, correctAnswer, client) {
+  async markCompleted(id, client) {
     const db = client ?? this.pool;
     const { rows } = await db.query(
       `UPDATE active_recall
-       SET correct_answer = $2
+       SET completed = true
        WHERE id = $1 AND deleted = false
        RETURNING *`,
-      [id, correctAnswer],
+      [id],
     );
     return rows[0] ?? null;
   }

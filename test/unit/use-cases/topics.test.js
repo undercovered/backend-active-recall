@@ -38,19 +38,25 @@ function topicHarness() {
     pool: txPool(),
     subjectRepository: {
       async findById(id) {
-        return subjects.find((s) => s.id === id) ?? null;
+        return subjects.find((s) => s.id === id && !s.deleted) ?? null;
       },
     },
     topicRepository: {
       async findAll({ search, subjectId } = {}) {
         return topics.filter((t) => {
+          if (t.deleted) return false;
+          const subject = subjects.find((s) => s.id === t.subjectId && !s.deleted);
+          if (!subject) return false;
           if (subjectId && t.subjectId !== subjectId) return false;
           if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
           return true;
         });
       },
       async findById(id) {
-        return topics.find((t) => t.id === id) ?? null;
+        const topic = topics.find((t) => t.id === id && !t.deleted);
+        if (!topic) return null;
+        const subject = subjects.find((s) => s.id === topic.subjectId && !s.deleted);
+        return subject ? topic : null;
       },
       async create(data) {
         const t = new Topic({ id: `top-${topics.length + 1}`, ...data });
@@ -115,8 +121,9 @@ function topicHarness() {
             new ActiveRecall({
               id: `ar-${recalls.length + i + 1}`,
               dateRecall: item.dateRecall,
-              correctAnswer: item.correctAnswer ?? null,
+              completed: item.completed === true,
               topicId: item.topicId,
+              subjectId: item.subjectId,
             }),
         );
         recalls.push(...created);
@@ -152,7 +159,7 @@ describe('Topic use cases', () => {
     assert.equal(result.title, 'Loops');
     assert.equal(result.flashcards.length, 2);
     assert.equal(h.recalls.length, 7);
-    assert.ok(h.recalls.every((r) => r.correctAnswer === null));
+    assert.ok(h.recalls.every((r) => r.completed === false));
     assert.equal(h.pool.client.queries.includes('COMMIT'), true);
   });
 
@@ -239,6 +246,14 @@ describe('Topic use cases', () => {
     assert.ok(h.pool.client.queries.includes('ROLLBACK'));
   });
 
+  test('GetAllTopics hides topics whose subject is soft-deleted', async () => {
+    const h = topicHarness();
+    h.topics.push(new Topic({ id: '1', title: 'Loops', subjectId: 'sub-1' }));
+    h.subjects[0].deleted = true;
+    const list = await new GetAllTopics({ topicRepository: h.topicRepository }).execute();
+    assert.equal(list.length, 0);
+  });
+
   test('GetAllTopics filters by subject and search', async () => {
     const h = topicHarness();
     h.topics.push(
@@ -260,11 +275,28 @@ describe('Topic use cases', () => {
         id: 'fc-1',
         question: 'Q',
         topicId: 'top-1',
+        subjectId: 'sub-1',
         answerTypeId: 'at-o',
       }),
     );
-    h.answers.push(new Answer({ id: 'a1', answerText: 'yes', flashcardId: 'fc-1', isCorrect: true }));
-    h.recalls.push(new ActiveRecall({ id: 'r1', dateRecall: new Date(), topicId: 'top-1' }));
+    h.answers.push(
+      new Answer({
+        id: 'a1',
+        answerText: 'yes',
+        flashcardId: 'fc-1',
+        topicId: 'top-1',
+        subjectId: 'sub-1',
+        isCorrect: true,
+      }),
+    );
+    h.recalls.push(
+      new ActiveRecall({
+        id: 'r1',
+        dateRecall: new Date(),
+        topicId: 'top-1',
+        subjectId: 'sub-1',
+      }),
+    );
     const result = await new GetTopicById(h).execute('top-1');
     assert.equal(result.flashcard.question, 'Q');
     assert.equal(result.flashcards[0].answers.length, 1);
@@ -274,6 +306,13 @@ describe('Topic use cases', () => {
   test('GetTopicById 404', async () => {
     const h = topicHarness();
     await assert.rejects(() => new GetTopicById(h).execute('x'), NotFoundError);
+  });
+
+  test('GetTopicById 404 when the parent subject is soft-deleted', async () => {
+    const h = topicHarness();
+    h.topics.push(new Topic({ id: 'top-1', title: 'Loops', subjectId: 'sub-1' }));
+    h.subjects[0].deleted = true;
+    await assert.rejects(() => new GetTopicById(h).execute('top-1'), NotFoundError);
   });
 
   test('UpdateTopic and DeleteTopic', async () => {

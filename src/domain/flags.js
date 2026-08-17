@@ -6,6 +6,10 @@ function asDeleted(value) {
   return value === true || value === 't' || value === 'true';
 }
 
+function asCompleted(value) {
+  return value === true || value === 't' || value === 'true';
+}
+
 function asEnabled(value) {
   if (value === undefined || value === null) {
     return true;
@@ -13,4 +17,4 @@ function asEnabled(value) {
   return value !== false && value !== 'f' && value !== 'false';
 }
 
-module.exports = { asDeleted, asEnabled };
+module.exports = { asDeleted, asCompleted, asEnabled };
