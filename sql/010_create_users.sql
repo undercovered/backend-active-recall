@@ -27,7 +27,7 @@ COMMENT ON TABLE  users                    IS 'Cuentas de la aplicación (nombre
 COMMENT ON COLUMN users.first_name         IS 'Nombre.';
 COMMENT ON COLUMN users.last_name          IS 'Apellidos.';
 COMMENT ON COLUMN users.email              IS 'Correo electrónico (único, se guarda en minúsculas).';
-COMMENT ON COLUMN users.username           IS 'Nombre de usuario (único, se guarda en minúsculas).';
+COMMENT ON COLUMN users.username           IS 'Nombre de usuario (único, 8-40 caracteres, solo minúsculas, números o _).';
 COMMENT ON COLUMN users.phone_country_code IS 'Indicativo telefónico (p. ej. +57).';
 COMMENT ON COLUMN users.phone              IS 'Número de teléfono sin el indicativo.';
 COMMENT ON COLUMN users.password_hash      IS 'Hash irreversible (HMAC con PASSWORD_PEPPER + scrypt). Nunca texto plano.';

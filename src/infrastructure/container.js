@@ -37,12 +37,15 @@ const UpdateTopic = require('../application/use-cases/UpdateTopic');
 const DeleteTopic = require('../application/use-cases/DeleteTopic');
 const GetAllAnswerTypes = require('../application/use-cases/GetAllAnswerTypes');
 const GetDueReviews = require('../application/use-cases/GetDueReviews');
+const GetDashboardStats = require('../application/use-cases/GetDashboardStats');
 const GetReviewSession = require('../application/use-cases/GetReviewSession');
 const SubmitReviewAnswer = require('../application/use-cases/SubmitReviewAnswer');
 const GradeOpenAnswer = require('../application/use-cases/GradeOpenAnswer');
 const LoginUser = require('../application/use-cases/LoginUser');
+const CreateUser = require('../application/use-cases/CreateUser');
 const RegisterUser = require('../application/use-cases/RegisterUser');
 const GetCurrentUser = require('../application/use-cases/GetCurrentUser');
+const RequestPasswordReset = require('../application/use-cases/RequestPasswordReset');
 
 // --- Active persistence implementation (swap here to change database) ---
 const subjectRepository = new PgSubjectRepository(pool);
@@ -82,6 +85,11 @@ const updateTopic = new UpdateTopic({ topicRepository });
 const deleteTopic = new DeleteTopic({ topicRepository });
 const getAllAnswerTypes = new GetAllAnswerTypes({ answerTypeRepository });
 const getDueReviews = new GetDueReviews({ activeRecallRepository });
+const getDashboardStats = new GetDashboardStats({
+  topicRepository,
+  subjectRepository,
+  activeRecallRepository,
+});
 const getReviewSession = new GetReviewSession({
   activeRecallRepository,
   flashcardRepository,
@@ -103,8 +111,10 @@ const gradeOpenAnswer = new GradeOpenAnswer({
   userAnswerRepository,
 });
 const loginUser = new LoginUser({ userRepository });
+const createUser = new CreateUser({ userRepository });
 const registerUser = new RegisterUser({ userRepository });
 const getCurrentUser = new GetCurrentUser({ userRepository });
+const requestPasswordReset = new RequestPasswordReset({ userRepository });
 
 module.exports = {
   pool,
@@ -130,10 +140,13 @@ module.exports = {
   deleteTopic,
   getAllAnswerTypes,
   getDueReviews,
+  getDashboardStats,
   getReviewSession,
   submitReviewAnswer,
   gradeOpenAnswer,
   loginUser,
+  createUser,
   registerUser,
   getCurrentUser,
+  requestPasswordReset,
 };

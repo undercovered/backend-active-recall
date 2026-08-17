@@ -7,6 +7,7 @@ const {
 const SubjectController = require('../../src/interfaces/http/controllers/SubjectController');
 const TopicController = require('../../src/interfaces/http/controllers/TopicController');
 const ReviewController = require('../../src/interfaces/http/controllers/ReviewController');
+const DashboardController = require('../../src/interfaces/http/controllers/DashboardController');
 const AnswerTypeController = require('../../src/interfaces/http/controllers/AnswerTypeController');
 const CreateSubject = require('../../src/application/use-cases/CreateSubject');
 const GetAllSubjects = require('../../src/application/use-cases/GetAllSubjects');
@@ -20,13 +21,17 @@ const UpdateTopic = require('../../src/application/use-cases/UpdateTopic');
 const DeleteTopic = require('../../src/application/use-cases/DeleteTopic');
 const GetAllAnswerTypes = require('../../src/application/use-cases/GetAllAnswerTypes');
 const GetDueReviews = require('../../src/application/use-cases/GetDueReviews');
+const GetDashboardStats = require('../../src/application/use-cases/GetDashboardStats');
 const GetReviewSession = require('../../src/application/use-cases/GetReviewSession');
 const SubmitReviewAnswer = require('../../src/application/use-cases/SubmitReviewAnswer');
 const GradeOpenAnswer = require('../../src/application/use-cases/GradeOpenAnswer');
 const LoginUser = require('../../src/application/use-cases/LoginUser');
+const CreateUser = require('../../src/application/use-cases/CreateUser');
 const RegisterUser = require('../../src/application/use-cases/RegisterUser');
 const GetCurrentUser = require('../../src/application/use-cases/GetCurrentUser');
+const RequestPasswordReset = require('../../src/application/use-cases/RequestPasswordReset');
 const AuthController = require('../../src/interfaces/http/controllers/AuthController');
+const UserController = require('../../src/interfaces/http/controllers/UserController');
 const requireAuth = require('../../src/interfaces/http/middlewares/requireAuth');
 const { createMemoryRepos } = require('./memoryRepos');
 
@@ -50,9 +55,16 @@ function createMemoryApp() {
     loginUser: new LoginUser(repos),
     registerUser: new RegisterUser(repos),
     getCurrentUser: new GetCurrentUser(repos),
+    requestPasswordReset: new RequestPasswordReset(repos),
   });
+  const users = new UserController({
+    createUser: new CreateUser(repos),
+  });
+  app.post('/api/users', users.create);
+
   app.post('/api/auth/login', auth.login);
   app.post('/api/auth/register', auth.register);
+  app.post('/api/auth/password-reset', auth.requestReset);
   app.get(
     '/api/auth/me',
     requireAuth.createRequireAuth({ userRepository: repos.userRepository }),
@@ -100,6 +112,11 @@ function createMemoryApp() {
   app.get('/api/reviews/session', reviews.session);
   app.post('/api/reviews/answer', reviews.answer);
   app.post('/api/reviews/grade', reviews.grade);
+
+  const dashboard = new DashboardController({
+    getDashboardStats: new GetDashboardStats(repos),
+  });
+  app.get('/api/dashboard/stats', dashboard.stats);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

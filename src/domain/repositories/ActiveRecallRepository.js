@@ -3,6 +3,10 @@ class ActiveRecallRepository {
     throw new Error('ActiveRecallRepository.findByTopicId() not implemented.');
   }
 
+  async findAllForAliveTopics() {
+    throw new Error('ActiveRecallRepository.findAllForAliveTopics() not implemented.');
+  }
+
   async createMany(items, client) {
     throw new Error('ActiveRecallRepository.createMany() not implemented.');
   }

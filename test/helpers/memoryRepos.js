@@ -224,6 +224,14 @@ function createMemoryRepos() {
     async findByTopicId(topicId) {
       return recalls.filter((r) => r.topicId === topicId && alive(r));
     },
+    async findAllForAliveTopics() {
+      return recalls.filter((r) => {
+        if (!alive(r)) return false;
+        const topic = topics.find((t) => t.id === r.topicId && alive(t));
+        const subject = subjects.find((s) => s.id === topic?.subjectId && alive(s));
+        return Boolean(topic && subject);
+      });
+    },
     async createMany(items) {
       const created = items.map(
         (item, i) =>

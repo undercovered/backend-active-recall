@@ -19,6 +19,18 @@ class PgActiveRecallRepository extends ActiveRecallRepository {
     return rows.map(ActiveRecall.fromRow);
   }
 
+  async findAllForAliveTopics() {
+    const { rows } = await this.pool.query(
+      `SELECT ar.*
+       FROM active_recall ar
+       JOIN topics t ON t.id = ar.topic_id AND t.deleted = false
+       JOIN subjects s ON s.id = t.subject_id AND s.deleted = false
+       WHERE ar.deleted = false
+       ORDER BY ar.topic_id, ar.date_recall ASC`,
+    );
+    return rows.map(ActiveRecall.fromRow);
+  }
+
   async createMany(items, client) {
     const created = [];
     for (const item of items) {

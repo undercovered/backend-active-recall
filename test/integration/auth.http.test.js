@@ -21,14 +21,15 @@ describe('HTTP integration — auth', () => {
         firstName: 'Ana',
         lastName: 'Pérez',
         email: 'ana@mail.com',
-        username: 'ana_1',
-        password: 'Secreto123',
+        username: 'ana_user',
+        password: 'Secreto1!',
+        passwordConfirm: 'Secreto1!',
         phoneCountryCode: '+57',
         phone: '3001112233',
       },
     });
     assert.equal(created.status, 201);
-    assert.equal(created.body.data.username, 'ana_1');
+    assert.equal(created.body.data.username, 'ana_user');
     assert.equal(created.body.data.passwordHash, undefined);
     assert.equal(created.body.data.enabled, true);
     assert.equal(created.body.data.deleted, false);
@@ -36,7 +37,7 @@ describe('HTTP integration — auth', () => {
     const missingUser = await request(app, {
       method: 'POST',
       path: '/api/auth/login',
-      body: { identifier: 'ghost', password: 'Secreto123' },
+      body: { identifier: 'ghost', password: 'Secreto1!' },
     });
     assert.equal(missingUser.status, 401);
     assert.equal(missingUser.body.code, 'AUTH_USERNAME_NOT_FOUND');
@@ -44,14 +45,14 @@ describe('HTTP integration — auth', () => {
     const missingEmail = await request(app, {
       method: 'POST',
       path: '/api/auth/login',
-      body: { identifier: 'no@mail.com', password: 'Secreto123' },
+      body: { identifier: 'no@mail.com', password: 'Secreto1!' },
     });
     assert.equal(missingEmail.body.code, 'AUTH_EMAIL_NOT_FOUND');
 
     const badPass = await request(app, {
       method: 'POST',
       path: '/api/auth/login',
-      body: { identifier: 'ana_1', password: 'nope' },
+      body: { identifier: 'ana_user', password: 'nope' },
     });
     assert.equal(badPass.body.code, 'AUTH_INVALID_PASSWORD');
     assert.match(badPass.body.msg, /incorrecta/i);
@@ -59,7 +60,7 @@ describe('HTTP integration — auth', () => {
     const login = await request(app, {
       method: 'POST',
       path: '/api/auth/login',
-      body: { identifier: 'ana@mail.com', password: 'Secreto123' },
+      body: { identifier: 'ana@mail.com', password: 'Secreto1!' },
     });
     assert.equal(login.status, 200);
     assert.ok(login.body.data.token);
@@ -74,6 +75,55 @@ describe('HTTP integration — auth', () => {
     const noSession = await request(app, { path: '/api/auth/me' });
     assert.equal(noSession.status, 401);
     assert.equal(noSession.body.code, 'AUTH_SESSION_REQUIRED');
+  });
+
+  test('password reset accepts a known email and rejects a missing one', async () => {
+    await request(app, {
+      method: 'POST',
+      path: '/api/auth/register',
+      body: {
+        firstName: 'Ana',
+        lastName: 'Pérez',
+        email: 'ana@mail.com',
+        username: 'ana_user',
+        password: 'Secreto1!',
+        passwordConfirm: 'Secreto1!',
+      },
+    });
+
+    const missing = await request(app, {
+      method: 'POST',
+      path: '/api/auth/password-reset',
+      body: { email: 'no@mail.com' },
+    });
+    assert.equal(missing.status, 401);
+    assert.equal(missing.body.code, 'AUTH_EMAIL_NOT_FOUND');
+
+    const ok = await request(app, {
+      method: 'POST',
+      path: '/api/auth/password-reset',
+      body: { email: 'ana@mail.com' },
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.data.sent, true);
+    assert.match(ok.body.msg, /correo de confirmación/i);
+  });
+
+  test('register rejects when the passwords do not match', async () => {
+    const res = await request(app, {
+      method: 'POST',
+      path: '/api/auth/register',
+      body: {
+        firstName: 'Ana',
+        lastName: 'Pérez',
+        email: 'ana@mail.com',
+        username: 'ana_user',
+        password: 'Secreto1!',
+        passwordConfirm: 'Otra1!',
+      },
+    });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'AUTH_PASSWORD_MISMATCH');
   });
 
   test('blank identifier is a validation error with a code', async () => {

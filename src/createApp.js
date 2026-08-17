@@ -26,6 +26,7 @@ function createApp() {
   );
 
   app.use('/api/auth', require('./interfaces/http/routes/auth.routes'));
+  app.use('/api/users', require('./interfaces/http/routes/user.routes'));
 
   app.use('/api', requireAuth.createRequireAuth({ userRepository }));
 
@@ -44,6 +45,7 @@ function createApp() {
     require('./interfaces/http/routes/answerType.routes'),
   );
   app.use('/api/reviews', require('./interfaces/http/routes/review.routes'));
+  app.use('/api/dashboard', require('./interfaces/http/routes/dashboard.routes'));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

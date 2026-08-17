@@ -2,7 +2,7 @@ const ValidationError = require('../errors/ValidationError');
 const { asDeleted, asEnabled } = require('../flags');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const USERNAME_RE = /^[a-z0-9_]{3,40}$/;
+const USERNAME_RE = /^[a-z0-9_]{8,40}$/;
 
 class User {
   constructor({
@@ -39,7 +39,7 @@ class User {
     this.firstName = String(firstName).trim();
     this.lastName = String(lastName).trim();
     this.email = String(email).trim().toLowerCase();
-    this.username = String(username).trim().toLowerCase();
+    this.username = String(username).trim();
     this.phoneCountryCode = phoneCountryCode
       ? String(phoneCountryCode).trim()
       : null;
@@ -55,7 +55,7 @@ class User {
     }
     if (!USERNAME_RE.test(this.username)) {
       throw new ValidationError(
-        'El usuario debe tener 3-40 caracteres (letras, números o _).',
+        'El usuario debe tener al menos 8 caracteres, solo minúsculas, números o _.',
         'AUTH_USERNAME_INVALID',
       );
     }

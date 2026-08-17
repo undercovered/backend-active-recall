@@ -11,6 +11,7 @@ const { signToken, verifyToken, parseExpiresIn } = require('../../../src/infrast
 const LoginUser = require('../../../src/application/use-cases/LoginUser');
 const RegisterUser = require('../../../src/application/use-cases/RegisterUser');
 const GetCurrentUser = require('../../../src/application/use-cases/GetCurrentUser');
+const RequestPasswordReset = require('../../../src/application/use-cases/RequestPasswordReset');
 const { createMemoryRepos } = require('../../helpers/memoryRepos');
 
 describe('User entity', () => {
@@ -20,11 +21,11 @@ describe('User entity', () => {
       firstName: ' Ana ',
       lastName: ' Pérez ',
       email: 'Ana@Mail.com',
-      username: 'Ana_1',
+      username: 'ana_user',
       passwordHash: 'hash',
     });
     assert.equal(u.email, 'ana@mail.com');
-    assert.equal(u.username, 'ana_1');
+    assert.equal(u.username, 'ana_user');
     assert.equal(u.toJSON().passwordHash, undefined);
     assert.equal(u.toJSON().firstName, 'Ana');
     assert.equal(u.toJSON().enabled, true);
@@ -38,7 +39,7 @@ describe('User entity', () => {
           firstName: 'A',
           lastName: 'B',
           email: 'not-an-email',
-          username: 'ok_user',
+          username: 'ok_users',
           passwordHash: 'h',
         }),
       ValidationError,
@@ -53,6 +54,17 @@ describe('User entity', () => {
           passwordHash: 'h',
         }),
       ValidationError,
+    );
+    assert.throws(
+      () =>
+        new User({
+          firstName: 'A',
+          lastName: 'B',
+          email: 'a@b.com',
+          username: 'Ana_user',
+          passwordHash: 'h',
+        }),
+      (err) => err instanceof ValidationError && err.code === 'AUTH_USERNAME_INVALID',
     );
   });
 });
@@ -90,24 +102,25 @@ describe('Auth use cases', () => {
       firstName: 'Ana',
       lastName: 'Pérez',
       email: 'ana@mail.com',
-      username: 'ana_1',
-      password: 'Secreto123',
+      username: 'ana_user',
+      password: 'Secreto1!',
+      passwordConfirm: 'Secreto1!',
       phoneCountryCode: '+57',
       phone: '3001234567',
     });
-    assert.equal(registered.username, 'ana_1');
+    assert.equal(registered.username, 'ana_user');
     assert.equal(registered.passwordHash, undefined);
 
     const byUser = await new LoginUser(repos).execute({
-      identifier: 'Ana_1',
-      password: 'Secreto123',
+      identifier: 'Ana_user',
+      password: 'Secreto1!',
     });
     assert.ok(byUser.token);
     assert.equal(byUser.user.email, 'ana@mail.com');
 
     const byEmail = await new LoginUser(repos).execute({
       identifier: 'ana@mail.com',
-      password: 'Secreto123',
+      password: 'Secreto1!',
     });
     assert.ok(byEmail.token);
 
@@ -121,8 +134,9 @@ describe('Auth use cases', () => {
       firstName: 'Ana',
       lastName: 'Pérez',
       email: 'ana@mail.com',
-      username: 'ana_1',
-      password: 'Secreto123',
+      username: 'ana_user',
+      password: 'Secreto1!',
+      passwordConfirm: 'Secreto1!',
     });
     const login = new LoginUser(repos);
 
@@ -135,7 +149,7 @@ describe('Auth use cases', () => {
       (err) => err instanceof AuthError && err.code === 'AUTH_EMAIL_NOT_FOUND',
     );
     await assert.rejects(
-      () => login.execute({ identifier: 'ana_1', password: 'bad' }),
+      () => login.execute({ identifier: 'ana_user', password: 'bad' }),
       (err) => err instanceof AuthError && err.code === 'AUTH_INVALID_PASSWORD',
     );
   });
@@ -146,12 +160,13 @@ describe('Auth use cases', () => {
       firstName: 'Ana',
       lastName: 'Pérez',
       email: 'ana@mail.com',
-      username: 'ana_1',
-      password: 'Secreto123',
+      username: 'ana_user',
+      password: 'Secreto1!',
+      passwordConfirm: 'Secreto1!',
     };
     await new RegisterUser(repos).execute(input);
     await assert.rejects(
-      () => new RegisterUser(repos).execute({ ...input, username: 'other' }),
+      () => new RegisterUser(repos).execute({ ...input, username: 'other_user' }),
       (err) => err.code === 'AUTH_EMAIL_TAKEN',
     );
     await assert.rejects(
@@ -166,6 +181,19 @@ describe('Auth use cases', () => {
       () => new RegisterUser(repos).execute({ ...input, password: '123' }),
       ValidationError,
     );
+    await assert.rejects(
+      () => new RegisterUser(repos).execute({ ...input, password: 'Secreto1' }),
+      (err) => err instanceof ValidationError && err.code === 'AUTH_PASSWORD_WEAK',
+    );
+    await assert.rejects(
+      () =>
+        new RegisterUser(repos).execute({
+          ...input,
+          passwordConfirm: 'Otra1!',
+        }),
+      (err) =>
+        err instanceof ValidationError && err.code === 'AUTH_PASSWORD_MISMATCH',
+    );
   });
 
   test('disabled account cannot sign in or restore a session', async () => {
@@ -174,8 +202,9 @@ describe('Auth use cases', () => {
       firstName: 'Ana',
       lastName: 'Pérez',
       email: 'ana@mail.com',
-      username: 'ana_1',
-      password: 'Secreto123',
+      username: 'ana_user',
+      password: 'Secreto1!',
+      passwordConfirm: 'Secreto1!',
     });
     const stored = repos.users.find((u) => u.id === registered.id);
     stored.enabled = false;
@@ -183,14 +212,38 @@ describe('Auth use cases', () => {
     await assert.rejects(
       () =>
         new LoginUser(repos).execute({
-          identifier: 'ana_1',
-          password: 'Secreto123',
+          identifier: 'ana_user',
+          password: 'Secreto1!',
         }),
       (err) => err instanceof AuthError && err.code === 'AUTH_USER_DISABLED',
     );
     await assert.rejects(
       () => new GetCurrentUser(repos).execute(registered.id),
       (err) => err.code === 'AUTH_USER_DISABLED',
+    );
+  });
+
+  test('password reset requires an existing enabled email', async () => {
+    const repos = createMemoryRepos();
+    await new RegisterUser(repos).execute({
+      firstName: 'Ana',
+      lastName: 'Pérez',
+      email: 'ana@mail.com',
+      username: 'ana_user',
+      password: 'Secreto1!',
+      passwordConfirm: 'Secreto1!',
+    });
+    const reset = new RequestPasswordReset(repos);
+    const sent = await reset.execute({ email: 'Ana@Mail.com' });
+    assert.deepEqual(sent, { sent: true, email: 'ana@mail.com' });
+
+    await assert.rejects(
+      () => reset.execute({ email: 'no@mail.com' }),
+      (err) => err instanceof AuthError && err.code === 'AUTH_EMAIL_NOT_FOUND',
+    );
+    await assert.rejects(
+      () => reset.execute({ email: 'not-an-email' }),
+      ValidationError,
     );
   });
 });

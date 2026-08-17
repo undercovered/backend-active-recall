@@ -99,6 +99,7 @@ describe('repository ports throw until implemented', () => {
 
     const ar = new ActiveRecallRepository();
     await assert.rejects(() => ar.findByTopicId('t'));
+    await assert.rejects(() => ar.findAllForAliveTopics());
     await assert.rejects(() => ar.createMany([]));
     await assert.rejects(() => ar.countDueOn('2026-01-01'));
     await assert.rejects(() => ar.findDueOn('2026-01-01'));

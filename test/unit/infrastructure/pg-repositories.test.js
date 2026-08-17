@@ -228,6 +228,8 @@ describe('PgActiveRecallRepository', () => {
 
     const byTopic = await repo.findByTopicId('t1');
     assert.equal(byTopic[0].correctAnswer, null);
+    const all = await repo.findAllForAliveTopics();
+    assert.equal(all[0].topicId, 't1');
   });
 
   test('countDueOn defaults to zeros when the driver returns no row', async () => {
@@ -275,7 +277,7 @@ describe('PgUserRepository', () => {
     first_name: 'Ana',
     last_name: 'Pérez',
     email: 'ana@mail.com',
-    username: 'ana_1',
+    username: 'ana_user',
     phone_country_code: '+57',
     phone: '300',
     password_hash: 'scrypt$hash',
@@ -288,14 +290,14 @@ describe('PgUserRepository', () => {
   test('findByUsername / email / id and create map fromRow', async () => {
     const pool = fakePool(() => ({ rows: [userRow] }));
     const repo = new PgUserRepository(pool);
-    assert.equal((await repo.findByUsername('Ana_1')).email, 'ana@mail.com');
-    assert.equal((await repo.findByEmail('ana@mail.com')).username, 'ana_1');
+    assert.equal((await repo.findByUsername('Ana_user')).email, 'ana@mail.com');
+    assert.equal((await repo.findByEmail('ana@mail.com')).username, 'ana_user');
     assert.equal((await repo.findById('u1')).firstName, 'Ana');
     const created = await repo.create({
       firstName: 'Ana',
       lastName: 'Pérez',
       email: 'ana@mail.com',
-      username: 'ana_1',
+      username: 'ana_user',
       phoneCountryCode: '+57',
       phone: '300',
       passwordHash: 'scrypt$hash',
