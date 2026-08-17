@@ -5,7 +5,11 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "node --watch app.js"
+    "dev": "node --watch app.js",
+    "debug": "node --inspect app.js",
+    "debug:brk": "node --inspect-brk app.js",
+    "debug:watch": "node --watch --inspect app.js",
+    "test": "node --test --test-concurrency=1 $(find test -name '*.test.js')"
   },
   "dependencies": {
     "cors": "^2.8.5",

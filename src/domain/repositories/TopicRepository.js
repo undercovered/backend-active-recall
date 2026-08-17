@@ -6,9 +6,10 @@
  */
 class TopicRepository {
   /**
+   * @param {{ search?: string, subjectId?: string }} [filters]
    * @returns {Promise<import('../entities/Topic')[]>}
    */
-  async findAll() {
+  async findAll(filters = {}) {
     throw new Error('TopicRepository.findAll() not implemented.');
   }
 
@@ -32,7 +33,7 @@ class TopicRepository {
    * @param {{ title: string, description?: string|null, subjectId: string }} data
    * @returns {Promise<import('../entities/Topic')>}
    */
-  async create(data) {
+  async create(data, client) {
     throw new Error('TopicRepository.create() not implemented.');
   }
 

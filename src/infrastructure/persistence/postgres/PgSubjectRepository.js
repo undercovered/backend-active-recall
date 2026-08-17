@@ -4,6 +4,7 @@ const Subject = require('../../../domain/entities/Subject');
 /**
  * PostgreSQL implementation of SubjectRepository.
  * Translates between domain entities and SQL rows using Subject.fromRow().
+ * Deletes are soft (`deleted = true`); reads ignore those rows.
  */
 class PgSubjectRepository extends SubjectRepository {
   /**
@@ -14,16 +15,29 @@ class PgSubjectRepository extends SubjectRepository {
     this.pool = pool;
   }
 
-  async findAll() {
+  async findAll({ search } = {}) {
+    const term = typeof search === 'string' ? search.trim() : '';
+    if (term) {
+      const { rows } = await this.pool.query(
+        `SELECT * FROM subjects
+         WHERE deleted = false AND title ILIKE $1
+         ORDER BY created_at DESC`,
+        [`%${term}%`],
+      );
+      return rows.map(Subject.fromRow);
+    }
+
     const { rows } = await this.pool.query(
-      'SELECT * FROM subjects ORDER BY created_at DESC',
+      `SELECT * FROM subjects
+       WHERE deleted = false
+       ORDER BY created_at DESC`,
     );
     return rows.map(Subject.fromRow);
   }
 
   async findById(id) {
     const { rows } = await this.pool.query(
-      'SELECT * FROM subjects WHERE id = $1',
+      'SELECT * FROM subjects WHERE id = $1 AND deleted = false',
       [id],
     );
     return rows[0] ? Subject.fromRow(rows[0]) : null;
@@ -44,7 +58,7 @@ class PgSubjectRepository extends SubjectRepository {
       `UPDATE subjects
        SET title       = COALESCE($2, title),
            description = COALESCE($3, description)
-       WHERE id = $1
+       WHERE id = $1 AND deleted = false
        RETURNING *`,
       [id, title ?? null, description ?? null],
     );
@@ -52,11 +66,56 @@ class PgSubjectRepository extends SubjectRepository {
   }
 
   async delete(id) {
-    const { rowCount } = await this.pool.query(
-      'DELETE FROM subjects WHERE id = $1',
+    const { rows } = await this.pool.query(
+      `UPDATE subjects
+       SET deleted = true
+       WHERE id = $1 AND deleted = false
+       RETURNING id`,
       [id],
     );
-    return rowCount > 0;
+    if (!rows[0]) {
+      return false;
+    }
+
+    await this.pool.query(
+      `UPDATE topics
+       SET deleted = true
+       WHERE subject_id = $1 AND deleted = false`,
+      [id],
+    );
+    await this.pool.query(
+      `UPDATE flashcards
+       SET deleted = true
+       WHERE deleted = false
+         AND topic_id IN (SELECT id FROM topics WHERE subject_id = $1)`,
+      [id],
+    );
+    await this.pool.query(
+      `UPDATE answers
+       SET deleted = true
+       WHERE deleted = false
+         AND flashcard_id IN (
+           SELECT f.id
+           FROM flashcards f
+           JOIN topics t ON t.id = f.topic_id
+           WHERE t.subject_id = $1
+         )`,
+      [id],
+    );
+    await this.pool.query(
+      `UPDATE active_recall
+       SET deleted = true
+       WHERE deleted = false
+         AND topic_id IN (SELECT id FROM topics WHERE subject_id = $1)`,
+      [id],
+    );
+    await this.pool.query(
+      `UPDATE user_answers
+       SET deleted = true
+       WHERE subject_id = $1 AND deleted = false`,
+      [id],
+    );
+    return true;
   }
 }
 

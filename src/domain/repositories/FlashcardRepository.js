@@ -29,10 +29,10 @@ class FlashcardRepository {
   }
 
   /**
-   * @param {{ question: string, topicId: string }} data
+   * @param {{ question: string, topicId: string, answerTypeId: string }} data
    * @returns {Promise<import('../entities/Flashcard')>}
    */
-  async create(data) {
+  async create(data, client) {
     throw new Error('FlashcardRepository.create() not implemented.');
   }
 

@@ -3,6 +3,7 @@ const Topic = require('../../../domain/entities/Topic');
 
 /**
  * PostgreSQL implementation of TopicRepository.
+ * Deletes are soft (`deleted = true`); reads ignore those rows.
  */
 class PgTopicRepository extends TopicRepository {
   /**
@@ -13,31 +14,45 @@ class PgTopicRepository extends TopicRepository {
     this.pool = pool;
   }
 
-  async findAll() {
+  db(client) {
+    return client ?? this.pool;
+  }
+
+  async findAll({ search, subjectId } = {}) {
+    const term = typeof search === 'string' ? search.trim() : '';
+    const clauses = ['deleted = false'];
+    const values = [];
+
+    if (subjectId) {
+      values.push(subjectId);
+      clauses.push(`subject_id = $${values.length}`);
+    }
+    if (term) {
+      values.push(`%${term}%`);
+      clauses.push(`title ILIKE $${values.length}`);
+    }
+
     const { rows } = await this.pool.query(
-      'SELECT * FROM topics ORDER BY created_at DESC',
+      `SELECT * FROM topics WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC`,
+      values,
     );
     return rows.map(Topic.fromRow);
   }
 
   async findBySubjectId(subjectId) {
-    const { rows } = await this.pool.query(
-      'SELECT * FROM topics WHERE subject_id = $1 ORDER BY created_at DESC',
-      [subjectId],
-    );
-    return rows.map(Topic.fromRow);
+    return this.findAll({ subjectId });
   }
 
   async findById(id) {
     const { rows } = await this.pool.query(
-      'SELECT * FROM topics WHERE id = $1',
+      'SELECT * FROM topics WHERE id = $1 AND deleted = false',
       [id],
     );
     return rows[0] ? Topic.fromRow(rows[0]) : null;
   }
 
-  async create({ title, description = null, subjectId }) {
-    const { rows } = await this.pool.query(
+  async create({ title, description = null, subjectId }, client) {
+    const { rows } = await this.db(client).query(
       `INSERT INTO topics (title, description, subject_id)
        VALUES ($1, $2, $3)
        RETURNING *`,
@@ -51,7 +66,7 @@ class PgTopicRepository extends TopicRepository {
       `UPDATE topics
        SET title       = COALESCE($2, title),
            description = COALESCE($3, description)
-       WHERE id = $1
+       WHERE id = $1 AND deleted = false
        RETURNING *`,
       [id, title ?? null, description ?? null],
     );
@@ -59,11 +74,43 @@ class PgTopicRepository extends TopicRepository {
   }
 
   async delete(id) {
-    const { rowCount } = await this.pool.query(
-      'DELETE FROM topics WHERE id = $1',
+    const { rows } = await this.pool.query(
+      `UPDATE topics
+       SET deleted = true
+       WHERE id = $1 AND deleted = false
+       RETURNING id`,
       [id],
     );
-    return rowCount > 0;
+    if (!rows[0]) {
+      return false;
+    }
+
+    await this.pool.query(
+      `UPDATE flashcards
+       SET deleted = true
+       WHERE topic_id = $1 AND deleted = false`,
+      [id],
+    );
+    await this.pool.query(
+      `UPDATE answers
+       SET deleted = true
+       WHERE deleted = false
+         AND flashcard_id IN (SELECT id FROM flashcards WHERE topic_id = $1)`,
+      [id],
+    );
+    await this.pool.query(
+      `UPDATE active_recall
+       SET deleted = true
+       WHERE topic_id = $1 AND deleted = false`,
+      [id],
+    );
+    await this.pool.query(
+      `UPDATE user_answers
+       SET deleted = true
+       WHERE topic_id = $1 AND deleted = false`,
+      [id],
+    );
+    return true;
   }
 }
 

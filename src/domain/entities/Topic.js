@@ -5,6 +5,7 @@
  *   - subjectId is required (FK to subjects.id).
  */
 const ValidationError = require('../errors/ValidationError');
+const { asDeleted } = require('../flags');
 
 class Topic {
   /**
@@ -16,7 +17,7 @@ class Topic {
    * @param {Date|string} [params.createdAt]
    * @param {Date|string} [params.updatedAt]
    */
-  constructor({ id, title, description = null, subjectId, createdAt, updatedAt }) {
+  constructor({ id, title, description = null, subjectId, deleted = false, createdAt, updatedAt }) {
     if (!title || String(title).trim().length === 0) {
       throw new ValidationError('Topic.title is required and cannot be blank.');
     }
@@ -28,6 +29,7 @@ class Topic {
     this.title = String(title).trim();
     this.description = description;
     this.subjectId = subjectId;
+    this.deleted = asDeleted(deleted);
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -43,6 +45,7 @@ class Topic {
       title: row.title,
       description: row.description,
       subjectId: row.subject_id,
+      deleted: row.deleted,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     });
@@ -57,6 +60,7 @@ class Topic {
       title: this.title,
       description: this.description,
       subjectId: this.subjectId,
+      deleted: this.deleted,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

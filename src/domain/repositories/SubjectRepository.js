@@ -10,9 +10,10 @@
  */
 class SubjectRepository {
   /**
+   * @param {{ search?: string }} [filters] Optional filters (search = by title).
    * @returns {Promise<import('../entities/Subject')[]>}
    */
-  async findAll() {
+  async findAll(filters = {}) {
     throw new Error('SubjectRepository.findAll() not implemented.');
   }
 
