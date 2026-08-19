@@ -43,6 +43,7 @@ const UpdateFlashcard = require('../application/use-cases/UpdateFlashcard');
 const DeleteFlashcard = require('../application/use-cases/DeleteFlashcard');
 const GetDueReviews = require('../application/use-cases/GetDueReviews');
 const GetDashboardStats = require('../application/use-cases/GetDashboardStats');
+const GetStudyStreak = require('../application/use-cases/GetStudyStreak');
 const GetReviewSession = require('../application/use-cases/GetReviewSession');
 const SubmitReviewAnswer = require('../application/use-cases/SubmitReviewAnswer');
 const GradeOpenAnswer = require('../application/use-cases/GradeOpenAnswer');
@@ -130,6 +131,10 @@ const getDashboardStats = new GetDashboardStats({
   activeRecallRepository,
   flashcardRepository,
 });
+const getStudyStreak = new GetStudyStreak({
+  userAnswerRepository,
+  userRepository,
+});
 const getReviewSession = new GetReviewSession({
   activeRecallRepository,
   flashcardRepository,
@@ -186,6 +191,7 @@ module.exports = {
   deleteFlashcard,
   getDueReviews,
   getDashboardStats,
+  getStudyStreak,
   getReviewSession,
   submitReviewAnswer,
   gradeOpenAnswer,

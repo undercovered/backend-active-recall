@@ -70,6 +70,24 @@ class PgUserAnswerRepository extends UserAnswerRepository {
     );
     return rows.map(UserAnswer.fromRow);
   }
+
+  async countAttemptsByDay() {
+    const { rows } = await this.pool.query(
+      `SELECT created_at::date::text AS day,
+              COUNT(DISTINCT attempt_id)::int AS count
+       FROM user_answers
+       WHERE deleted = false
+       GROUP BY created_at::date
+       ORDER BY 1`,
+    );
+    const days = {};
+    for (const row of rows) {
+      if (row.day) {
+        days[row.day] = row.count;
+      }
+    }
+    return days;
+  }
 }
 
 module.exports = PgUserAnswerRepository;

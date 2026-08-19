@@ -374,7 +374,11 @@ function createMemoryRepos() {
       return userAnswers.filter((u) => attemptIds.includes(u.attemptId) && alive(u));
     },
     async create(data) {
-      const ua = new UserAnswer({ id: id('ua', userAnswers), ...data });
+      const ua = new UserAnswer({
+        id: id('ua', userAnswers),
+        ...data,
+        createdAt: data.createdAt ?? new Date().toISOString(),
+      });
       userAnswers.push(ua);
       return ua;
     },
@@ -387,6 +391,25 @@ function createMemoryRepos() {
         u.isCorrect = isCorrect;
       });
       return updated;
+    },
+    async countAttemptsByDay() {
+      const seen = new Map();
+      for (const ua of userAnswers) {
+        if (!alive(ua)) continue;
+        const raw = ua.createdAt;
+        const day =
+          raw instanceof Date
+            ? raw.toISOString().slice(0, 10)
+            : String(raw ?? '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+        if (!seen.has(day)) seen.set(day, new Set());
+        seen.get(day).add(ua.attemptId);
+      }
+      const days = {};
+      for (const [day, ids] of seen) {
+        days[day] = ids.size;
+      }
+      return days;
     },
   };
 

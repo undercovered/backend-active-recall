@@ -28,6 +28,7 @@ const DeleteFlashcard = require('../../src/application/use-cases/DeleteFlashcard
 const FlashcardController = require('../../src/interfaces/http/controllers/FlashcardController');
 const GetDueReviews = require('../../src/application/use-cases/GetDueReviews');
 const GetDashboardStats = require('../../src/application/use-cases/GetDashboardStats');
+const GetStudyStreak = require('../../src/application/use-cases/GetStudyStreak');
 const GetReviewSession = require('../../src/application/use-cases/GetReviewSession');
 const SubmitReviewAnswer = require('../../src/application/use-cases/SubmitReviewAnswer');
 const GradeOpenAnswer = require('../../src/application/use-cases/GradeOpenAnswer');
@@ -134,8 +135,10 @@ function createMemoryApp() {
 
   const dashboard = new DashboardController({
     getDashboardStats: new GetDashboardStats(repos),
+    getStudyStreak: new GetStudyStreak(repos),
   });
   app.get('/api/dashboard/stats', dashboard.stats);
+  app.get('/api/dashboard/streak', dashboard.streak);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

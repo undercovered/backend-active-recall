@@ -10,6 +10,10 @@ class UserAnswerRepository {
   async setCorrect(attemptId, flashcardId, isCorrect, client) {
     throw new Error('UserAnswerRepository.setCorrect() not implemented.');
   }
+
+  async countAttemptsByDay() {
+    throw new Error('UserAnswerRepository.countAttemptsByDay() not implemented.');
+  }
 }
 
 module.exports = UserAnswerRepository;

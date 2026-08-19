@@ -70,4 +70,35 @@ describe('HTTP integration — dashboard', () => {
       { id: subject.id, dueToday: 0, inProgress: 1 },
     ]);
   });
+
+  test('GET /api/dashboard/streak counts review attempts and starts this month without a user', async () => {
+    const subject = await repos.subjectRepository.create({
+      title: 'Java',
+      description: null,
+    });
+    const topic = await repos.topicRepository.create({
+      title: 'Streams',
+      subjectId: subject.id,
+    });
+    const card = await repos.flashcardRepository.create({
+      question: 'What is a stream?',
+      topicId: topic.id,
+      subjectId: subject.id,
+      answerTypeId: 'at-o',
+    });
+    await repos.userAnswerRepository.create({
+      attemptId: 'att-streak',
+      flashcardId: card.id,
+      openResponse: 'flujo',
+      subjectId: subject.id,
+      topicId: topic.id,
+      createdAt: '2026-08-18T12:00:00.000Z',
+    });
+
+    const res = await request(app, { path: '/api/dashboard/streak?date=2026-08-18' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data.today, '2026-08-18');
+    assert.equal(res.body.data.startedAt, '2026-08-01');
+    assert.equal(res.body.data.days['2026-08-18'], 1);
+  });
 });

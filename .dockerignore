@@ -1,0 +1,8 @@
+node_modules
+.git
+coverage
+*.md
+npm-debug.log
+.vscode
+.idea
+test
