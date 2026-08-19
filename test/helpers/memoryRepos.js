@@ -411,6 +411,17 @@ function createMemoryRepos() {
       }
       return days;
     },
+    async listAttemptStartedAt() {
+      const first = new Map();
+      for (const ua of userAnswers) {
+        if (!alive(ua) || !ua.createdAt) continue;
+        const prev = first.get(ua.attemptId);
+        if (prev == null || String(ua.createdAt) < String(prev)) {
+          first.set(ua.attemptId, ua.createdAt);
+        }
+      }
+      return [...first.values()];
+    },
   };
 
   const userRepository = {

@@ -280,6 +280,21 @@ describe('PgUserAnswerRepository', () => {
     const graded = await repo.setCorrect('att', 'f1', false);
     assert.equal(graded[0].id, 'u1');
   });
+
+  test('listAttemptStartedAt returns timestamps', async () => {
+    const started = new Date('2026-08-18T22:47:00.000Z');
+    const pool = fakePool(() => ({ rows: [{ started_at: started }] }));
+    const repo = new PgUserAnswerRepository(pool);
+    assert.deepEqual(await repo.listAttemptStartedAt(), [started]);
+  });
+
+  test('countAttemptsByDay uses YYYY-MM-DD keys', async () => {
+    const pool = fakePool(() => ({
+      rows: [{ day: '2026-08-18', count: 2 }],
+    }));
+    const repo = new PgUserAnswerRepository(pool);
+    assert.deepEqual(await repo.countAttemptsByDay(), { '2026-08-18': 2 });
+  });
 });
 
 describe('PgUserRepository', () => {

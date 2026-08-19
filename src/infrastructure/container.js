@@ -134,6 +134,7 @@ const getDashboardStats = new GetDashboardStats({
 const getStudyStreak = new GetStudyStreak({
   userAnswerRepository,
   userRepository,
+  activeRecallRepository,
 });
 const getReviewSession = new GetReviewSession({
   activeRecallRepository,

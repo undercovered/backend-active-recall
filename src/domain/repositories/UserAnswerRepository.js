@@ -14,6 +14,10 @@ class UserAnswerRepository {
   async countAttemptsByDay() {
     throw new Error('UserAnswerRepository.countAttemptsByDay() not implemented.');
   }
+
+  async listAttemptStartedAt() {
+    throw new Error('UserAnswerRepository.listAttemptStartedAt() not implemented.');
+  }
 }
 
 module.exports = UserAnswerRepository;

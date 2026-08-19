@@ -98,7 +98,9 @@ describe('HTTP integration — dashboard', () => {
     const res = await request(app, { path: '/api/dashboard/streak?date=2026-08-18' });
     assert.equal(res.status, 200);
     assert.equal(res.body.data.today, '2026-08-18');
-    assert.equal(res.body.data.startedAt, '2026-08-01');
+    assert.equal(res.body.data.startedAt, '2026-08-18');
+    assert.equal(res.body.data.endedAt, '2026-12-31');
     assert.equal(res.body.data.days['2026-08-18'], 1);
+    assert.equal(res.body.data.attempts.length, 1);
   });
 });

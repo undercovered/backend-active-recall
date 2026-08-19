@@ -73,20 +73,31 @@ class PgUserAnswerRepository extends UserAnswerRepository {
 
   async countAttemptsByDay() {
     const { rows } = await this.pool.query(
-      `SELECT created_at::date::text AS day,
+      `SELECT to_char(MIN(created_at), 'YYYY-MM-DD') AS day,
               COUNT(DISTINCT attempt_id)::int AS count
        FROM user_answers
        WHERE deleted = false
-       GROUP BY created_at::date
+       GROUP BY (created_at AT TIME ZONE 'UTC')::date
        ORDER BY 1`,
     );
     const days = {};
     for (const row of rows) {
-      if (row.day) {
-        days[row.day] = row.count;
+      const day = String(row.day ?? '').slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+        days[day] = Number(row.count) || 0;
       }
     }
     return days;
+  }
+
+  async listAttemptStartedAt() {
+    const { rows } = await this.pool.query(
+      `SELECT MIN(created_at) AS started_at
+       FROM user_answers
+       WHERE deleted = false
+       GROUP BY attempt_id`,
+    );
+    return rows.map((row) => row.started_at).filter(Boolean);
   }
 }
 
