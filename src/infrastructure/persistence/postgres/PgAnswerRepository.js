@@ -11,8 +11,8 @@ class PgAnswerRepository extends AnswerRepository {
     return client ?? this.pool;
   }
 
-  async findByFlashcardId(flashcardId) {
-    const { rows } = await this.pool.query(
+  async findByFlashcardId(flashcardId, client) {
+    const { rows } = await this.db(client).query(
       'SELECT * FROM answers WHERE flashcard_id = $1 AND deleted = false ORDER BY created_at ASC',
       [flashcardId],
     );
@@ -41,6 +41,15 @@ class PgAnswerRepository extends AnswerRepository {
       [answerText, isCorrect, flashcardId, topicId, subjectId],
     );
     return Answer.fromRow(rows[0]);
+  }
+
+  async softDeleteByFlashcardId(flashcardId, client) {
+    await this.db(client).query(
+      `UPDATE answers
+       SET deleted = true
+       WHERE flashcard_id = $1 AND deleted = false`,
+      [flashcardId],
+    );
   }
 }
 

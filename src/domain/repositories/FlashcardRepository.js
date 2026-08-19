@@ -12,6 +12,10 @@ class FlashcardRepository {
     throw new Error('FlashcardRepository.findAll() not implemented.');
   }
 
+  async findAllListed(filters) {
+    throw new Error('FlashcardRepository.findAllListed() not implemented.');
+  }
+
   /**
    * @param {string} topicId
    * @returns {Promise<import('../entities/Flashcard')[]>}

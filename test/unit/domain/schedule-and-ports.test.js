@@ -80,6 +80,7 @@ describe('repository ports throw until implemented', () => {
   test('FlashcardRepository', async () => {
     const r = new FlashcardRepository();
     await assert.rejects(() => r.findAll());
+    await assert.rejects(() => r.findAllListed());
     await assert.rejects(() => r.findByTopicId('t'));
     await assert.rejects(() => r.findById('x'));
     await assert.rejects(() => r.create({}));
@@ -91,6 +92,7 @@ describe('repository ports throw until implemented', () => {
     const a = new AnswerRepository();
     await assert.rejects(() => a.findByFlashcardId('f'));
     await assert.rejects(() => a.create({}));
+    await assert.rejects(() => a.softDeleteByFlashcardId('f'));
 
     const at = new AnswerTypeRepository();
     await assert.rejects(() => at.findAll());

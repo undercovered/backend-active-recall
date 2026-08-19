@@ -148,6 +148,7 @@ describe('GetDueReviews', () => {
     assert.equal(data.count, 1);
     assert.equal(data.topicCount, 1);
     assert.equal(data.date, '2026-08-16');
+    assert.deepEqual(data.topicIds, ['top-1']);
   });
 
   test('rejects a malformed date before touching the repository', async () => {
@@ -170,9 +171,13 @@ describe('GetDueReviews', () => {
         async countDueOn() {
           return { count: 0, topicCount: 0 };
         },
+        async findDueOn() {
+          return [];
+        },
       },
     }).execute({ date: '2026-08-16' });
     assert.equal(data.hasPending, false);
+    assert.deepEqual(data.topicIds, []);
   });
 });
 

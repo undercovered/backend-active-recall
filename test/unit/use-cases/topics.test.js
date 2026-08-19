@@ -298,6 +298,8 @@ describe('Topic use cases', () => {
       }),
     );
     const result = await new GetTopicById(h).execute('top-1');
+    assert.equal(result.title, 'Loops');
+    assert.equal(result.subjectTitle, 'Java');
     assert.equal(result.flashcard.question, 'Q');
     assert.equal(result.flashcards[0].answers.length, 1);
     assert.equal(result.recalls.length, 1);

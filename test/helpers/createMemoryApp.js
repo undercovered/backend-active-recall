@@ -20,6 +20,12 @@ const GetTopicById = require('../../src/application/use-cases/GetTopicById');
 const UpdateTopic = require('../../src/application/use-cases/UpdateTopic');
 const DeleteTopic = require('../../src/application/use-cases/DeleteTopic');
 const GetAllAnswerTypes = require('../../src/application/use-cases/GetAllAnswerTypes');
+const GetAllFlashcards = require('../../src/application/use-cases/GetAllFlashcards');
+const GetFlashcardById = require('../../src/application/use-cases/GetFlashcardById');
+const CreateFlashcard = require('../../src/application/use-cases/CreateFlashcard');
+const UpdateFlashcard = require('../../src/application/use-cases/UpdateFlashcard');
+const DeleteFlashcard = require('../../src/application/use-cases/DeleteFlashcard');
+const FlashcardController = require('../../src/interfaces/http/controllers/FlashcardController');
 const GetDueReviews = require('../../src/application/use-cases/GetDueReviews');
 const GetDashboardStats = require('../../src/application/use-cases/GetDashboardStats');
 const GetReviewSession = require('../../src/application/use-cases/GetReviewSession');
@@ -101,6 +107,19 @@ function createMemoryApp() {
     getAllAnswerTypes: new GetAllAnswerTypes(repos),
   });
   app.get('/api/answer-types', answerTypes.getAll);
+
+  const flashcards = new FlashcardController({
+    getAllFlashcards: new GetAllFlashcards(repos),
+    getFlashcardById: new GetFlashcardById(repos),
+    createFlashcard: new CreateFlashcard(repos),
+    updateFlashcard: new UpdateFlashcard(repos),
+    deleteFlashcard: new DeleteFlashcard(repos),
+  });
+  app.get('/api/flashcards', flashcards.getAll);
+  app.get('/api/flashcards/:id', flashcards.getById);
+  app.post('/api/flashcards', flashcards.create);
+  app.put('/api/flashcards/:id', flashcards.update);
+  app.delete('/api/flashcards/:id', flashcards.remove);
 
   const reviews = new ReviewController({
     getDueReviews: new GetDueReviews(repos),

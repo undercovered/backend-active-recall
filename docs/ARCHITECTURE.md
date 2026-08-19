@@ -1,16 +1,18 @@
 # Arquitectura — Backend (Active Recall)
 
-Documento técnico del **backend**. Describe cómo está construido y por qué.
-El cliente (front-end Angular) vive en un repositorio aparte y consume esta API.
+Documento técnico del **backend**. El cliente Angular vive en otro repositorio
+y consume esta API.
 
 - [1. Visión general](#1-visión-general)
 - [2. Clean Architecture](#2-clean-architecture)
 - [3. Capas y responsabilidades](#3-capas-y-responsabilidades)
-- [4. Capa de persistencia desacoplada](#4-capa-de-persistencia-desacoplada)
-- [5. Modelos de dominio](#5-modelos-de-dominio)
+- [4. Persistencia desacoplada](#4-persistencia-desacoplada)
+- [5. Modelo de dominio](#5-modelo-de-dominio)
 - [6. Esquema de base de datos](#6-esquema-de-base-de-datos)
-- [7. Decisiones y trade-offs](#7-decisiones-y-trade-offs)
-- [8. Roadmap técnico](#8-roadmap-técnico)
+- [7. Auth y sobre HTTP](#7-auth-y-sobre-http)
+- [8. Repaso y retención](#8-repaso-y-retención)
+- [9. Decisiones](#9-decisiones)
+- [10. Cómo se prueba](#10-cómo-se-prueba)
 
 ---
 
@@ -18,135 +20,85 @@ El cliente (front-end Angular) vive en un repositorio aparte y consume esta API.
 
 ```mermaid
 flowchart LR
-    Cliente["Cliente (front-end Angular)"] -- "HTTP REST /api" --> BE["Backend<br/>Node.js + Express"]
+    Cliente["Front Angular (Vercel)"] -- "HTTPS REST /api + JWT" --> BE["Backend Node + Express (AWS)"]
     BE -- "Repository → SQL" --> DB[("PostgreSQL")]
 ```
 
-El backend es una API REST desacoplada del cliente. Internamente sigue Clean
-Architecture para aislar la lógica de negocio de los detalles de infraestructura
-(framework HTTP y base de datos).
+API REST desacoplada del cliente. Clean Architecture aísla el dominio de Express
+y de `pg`.
 
 ---
 
 ## 2. Clean Architecture
 
-La **regla de dependencia** es la base: las capas externas dependen de las internas,
-**nunca al revés**.
+Las capas externas dependen de las internas, **nunca al revés**.
 
 ```mermaid
 flowchart TD
     subgraph Externo
-        FW["Frameworks & Drivers<br/>Express · pg · PostgreSQL"]
+        FW["Express · pg · PostgreSQL"]
     end
     subgraph Adaptadores
-        IA["Interface Adapters<br/>Repositorios (impl.) · Controllers"]
+        IA["Rutas · Controllers · Pg*Repository"]
     end
     subgraph Aplicación
-        UC["Use Cases<br/>(pendiente)"]
+        UC["Use cases"]
     end
     subgraph Dominio
-        EN["Entities + Repository Ports"]
+        EN["Entities + ports + retention + schedule"]
     end
-
     FW --> IA --> UC --> EN
 ```
-
-El **dominio** (entidades + interfaces de repositorio) no conoce Express ni `pg`.
-Es testeable de forma aislada y resistente a cambios de infraestructura.
 
 ---
 
 ## 3. Capas y responsabilidades
 
-| Capa               | Responsabilidad                                          | Conoce a...    |
-| ------------------ | -------------------------------------------------------- | -------------- |
-| **Domain**         | Entidades, reglas de negocio y contratos de repositorio  | Nada externo   |
-| **Infrastructure** | Conexión a BD, adaptadores de repositorio, cableado      | Domain         |
-| **app.js**         | Configuración de Express, rutas y arranque               | Infrastructure |
+| Capa               | Carpeta                     | Conoce a…        |
+| ------------------ | --------------------------- | ---------------- |
+| Domain             | `src/domain/`               | Nada externo     |
+| Application        | `src/application/use-cases/`| Domain           |
+| Interface adapters | `src/interfaces/http/`      | Application      |
+| Infrastructure     | `src/infrastructure/`       | Domain           |
+| Composition root   | `container.js` + `createApp.js` | Todo          |
 
-```
-src/
-├── domain/                    # ← Núcleo. Sin dependencias externas.
-│   ├── entities/              #   Reglas de negocio de cada entidad.
-│   └── repositories/          #   PORTS: contratos de persistencia (abstractos).
-└── infrastructure/            # ← Detalles técnicos (intercambiables).
-    ├── database/              #   Conexión (driver `pg`).
-    ├── persistence/postgres/  #   ADAPTERS: implementación de los ports.
-    └── container.js           #   Composition root.
-```
+`app.js` solo arranca el puerto, conecta el pool y cierra con SIGINT/SIGTERM.
 
 ---
 
-## 4. Capa de persistencia desacoplada
+## 4. Persistencia desacoplada
 
-Resuelve el requisito **"si cambiamos de base de datos, que no se afecten los
-modelos"** mediante el **patrón Repository** con inversión de dependencias.
+1. **Ports** en `domain/repositories/`: `findAll`, `findById`, `create`, `update`,
+   `delete` (soft), más operaciones específicas (`findByTopicId`, `markCompleted`…).
+2. **Adapters** `Pg*Repository`: el único SQL.
+3. **`container.js`**: elige PostgreSQL. Los tests HTTP usan `test/helpers/memoryRepos.js`
+   con los mismos use cases.
 
-1. **Ports (interfaces)** en `domain/repositories/`: definen *qué* operaciones
-   existen (`findAll`, `findById`, `create`, `update`, `delete`), trabajando siempre
-   con **entidades de dominio**, nunca con filas SQL.
-2. **Adapters** en `infrastructure/persistence/postgres/`: traducen entre SQL y
-   entidades con `Entity.fromRow()`. Son los únicos que escriben SQL.
-3. **Composition root** (`container.js`): el **único** archivo que decide qué
-   implementación se usa.
+Para cambiar de motor: nuevos adapters + pool, y un cambio en `container.js`.
 
-```mermaid
-classDiagram
-    class SubjectRepository {
-        <<interface / port>>
-        +findAll()
-        +findById(id)
-        +create(data)
-        +update(id, changes)
-        +delete(id)
-    }
-    class PgSubjectRepository {
-        -pool
-        +findAll()
-        +findById(id)
-    }
-    SubjectRepository <|-- PgSubjectRepository : implements
-    PgSubjectRepository ..> Subject : returns
-```
-
-**Cómo cambiar de base de datos (ej. a MySQL):**
-
-1. Crear `infrastructure/persistence/mysql/MySql*Repository.js` implementando los
-   mismos ports.
-2. Crear la conexión equivalente en `infrastructure/database/`.
-3. Cambiar los `require`/instancias en `container.js`.
-
-El dominio, los casos de uso y los controladores **no cambian ni una línea**.
+Los borrados son **lógicos** (`deleted = true`). Los repositorios de lectura
+añaden `deleted = false` y exigen que el tema y la materia padres también estén
+vivos.
 
 ---
 
-## 5. Modelos de dominio
+## 5. Modelo de dominio
 
-Cada entidad (`domain/entities/`):
+Cada entidad valida invariantes en el constructor, mapea con `fromRow()` y sale
+por API con `toJSON()` en **camelCase**.
 
-- Valida sus **invariantes** en el constructor (espejo de `NOT NULL` / `CHECK`).
-- `static fromRow(row)`: mapea `snake_case` (BD) → `camelCase` (dominio).
-- `toJSON()`: define el contrato de salida de la API.
+| Entidad        | Notas |
+| -------------- | ----- |
+| `User`         | `enabled`; login solo si está activo |
+| `Subject`      | Título obligatorio |
+| `Topic`        | Requiere `subjectId` |
+| `Flashcard`    | `topicId` + `subjectId` denormalizado + `answerTypeId` |
+| `Answer`       | `topicId` y `subjectId` denormalizados |
+| `ActiveRecall` | Un hito de agenda del **tema** (no de la pregunta) |
+| `UserAnswer`   | `attemptId` agrupa un intento; en la app es el `id` del recall |
 
-```js
-// backend/src/domain/entities/Subject.js
-class Subject {
-  constructor({ id, title, description = null, createdAt, updatedAt }) {
-    if (!title || String(title).trim().length === 0) {
-      throw new Error('Subject.title is required and cannot be blank.');
-    }
-    // ...
-  }
-  static fromRow(row) { /* created_at → createdAt ... */ }
-  toJSON() { /* forma expuesta por la API */ }
-}
-```
-
-| Entidad     | Campos de dominio                                          |
-| ----------- | --------------------------------------------------------- |
-| `Subject`   | `id`, `title`, `description`, `createdAt`, `updatedAt`     |
-| `Topic`     | `id`, `title`, `description`, `subjectId`, `createdAt`, `updatedAt` |
-| `Flashcard` | `id`, `question`, `topicId`, `createdAt`, `updatedAt`     |
+Tipos de respuesta: `single_choice` (exactamente una correcta),
+`multiple_choice` (al menos una), `open_answer` (una respuesta esperada).
 
 ---
 
@@ -154,62 +106,108 @@ class Subject {
 
 ```mermaid
 erDiagram
-    SUBJECTS ||--o{ TOPICS : "tiene"
-    TOPICS   ||--o{ FLASHCARDS : "tiene"
+    SUBJECTS ||--o{ TOPICS : tiene
+    TOPICS ||--o{ FLASHCARDS : tiene
+    TOPICS ||--o{ ACTIVE_RECALL : agenda
+    FLASHCARDS ||--o{ ANSWERS : opciones
+    FLASHCARDS ||--o{ USER_ANSWERS : intentos
+    ANSWER_TYPES ||--o{ FLASHCARDS : tipo
+    USERS ||--o{ USER_ANSWERS : responde
 
     SUBJECTS {
         uuid id PK
         varchar title
-        text description
-        timestamptz created_at
-        timestamptz updated_at
+        boolean deleted
     }
     TOPICS {
         uuid id PK
-        varchar title
-        text description
         uuid subject_id FK
-        timestamptz created_at
-        timestamptz updated_at
+        boolean deleted
     }
     FLASHCARDS {
         uuid id PK
-        text question
         uuid topic_id FK
-        timestamptz created_at
-        timestamptz updated_at
+        uuid subject_id FK
+        uuid answer_type_id FK
+        boolean deleted
+    }
+    ACTIVE_RECALL {
+        uuid id PK
+        date date_recall
+        boolean completed
+        uuid topic_id FK
+        uuid subject_id FK
     }
 ```
 
-Características de los scripts (`sql/`):
-
-- **UUID** como PK (`gen_random_uuid()`): apto para sistemas distribuidos/nube y
-  coincide con `crypto.randomUUID()` del cliente.
-- **`created_at` / `updated_at`** automáticos con trigger `set_updated_at()`.
-- **FK con `ON DELETE CASCADE`** e **índices** en las claves foráneas.
-- **`CHECK`** para impedir títulos/preguntas en blanco.
-- **Idempotentes** (`IF NOT EXISTS`, `CREATE OR REPLACE`).
+UUID como PK, `created_at` / `updated_at` con trigger, FKs, `CHECK` de textos no
+vacíos, scripts idempotentes. El orden está en el [README](../README.md#base-de-datos).
 
 ---
 
-## 7. Decisiones y trade-offs
+## 7. Auth y sobre HTTP
 
-| Decisión                           | Por qué                                            | Trade-off aceptado                    |
-| ---------------------------------- | -------------------------------------------------- | ------------------------------------- |
-| Clean Architecture                 | Independencia de BD y framework; testabilidad       | Más estructura desde el inicio        |
-| Patrón Repository (ports/adapters) | Cambiar de BD sin tocar dominio                    | Una capa extra de indirección         |
-| UUID como PK                       | Escalable a nube/distribuido; coincide con el front | Ligeramente más pesado que enteros    |
-| Migraciones SQL manuales           | Control total y simplicidad inicial                | Sin versionado automático (por ahora) |
-| Express minimalista                | Arrancar rápido y sin sobrecarga                   | Se añadirá estructura al crecer       |
+- Registro / login públicos. El resto de `/api` pasa por `requireAuth`.
+- Contraseña: política en `passwordPolicy.js`, hash **scrypt** con
+  `PASSWORD_PEPPER`.
+- Sesión: JWT en `Authorization: Bearer`.
+- Éxito: `{ data, msg }`. Error: `{ data: null, msg, code? }` con status HTTP
+  del `AppError` (`ValidationError` 400, `NotFoundError` 404, etc.).
+
+CORS está abierto (`cors()`) para que el front en `*.vercel.app` pueda llamar a
+la API en AWS sin configuración extra. En un entorno más estricto se puede
+restringir el origen.
 
 ---
 
-## 8. Roadmap técnico
+## 8. Repaso y retención
 
-1. **Casos de uso** (`src/application/use-cases/`): `CreateSubject`,
-   `ListTopicsBySubject`, etc., que orquestan entidades + repositorios.
-2. **Controladores y rutas** REST: `/api/subjects`, `/api/topics`, `/api/flashcards`.
-3. **Módulo de repaso**: añadir campos de agenda a `flashcards`
-   (`answer`, `next_review_date`, `interval_index`) y el motor de repetición espaciada.
-4. **Notificaciones** (cron job): servicio que consulta qué repasar hoy y avisa.
-5. **Testing**: pruebas unitarias del dominio y de los casos de uso.
+Al **crear un tema** (`CreateTopic`) se insertan, en transacción: el tema, cada
+pregunta con sus respuestas, y **7** `active_recall` según `recallSchedule.js`.
+
+`completed` en el recall = el alumno terminó de contestar **todas** las
+preguntas de esa sesión. No significa “todas correctas”.
+
+**Retención** (`domain/retention.js`), usada por `GetDashboardStats`:
+
+```
+R(t) = 100 × exp(−t / S)
+S    = 7 × 2.5^n
+```
+
+- `n`: número de recalls del tema con `completed === true`.
+- `t`: días entre el último recall completado (o `createdAt` del tema) y “hoy”.
+- Si `n ≥ 7` → 100 % fijo.
+- Si el tema es de hoy y `n = 0` → `t = 0` → **100 %** (aún no ha empezado el olvido).
+- El dashboard publica el promedio entre temas, o `null` si no hay ninguno.
+
+Las cards de materia cuentan **preguntas en proceso**: flashcards cuyo tema tiene
+`n < 7`. “Para repasar” en la card son las preguntas de temas con un recall
+pendiente cuya fecha es hoy o anterior.
+
+---
+
+## 9. Decisiones
+
+| Decisión                    | Por qué                                      | Trade-off |
+| --------------------------- | -------------------------------------------- | --------- |
+| Clean Architecture          | Cambiar de BD o de HTTP sin tocar reglas     | Más carpetas |
+| Soft delete                 | Recuperar y no romper historial              | Los GET siempre filtran |
+| FKs denormalizados          | Listados y cascadas más simples              | Hay que copiar `subject_id` al crear |
+| Repaso a nivel de **tema**  | Una sesión = todas las preguntas del tema    | No hay agenda independiente por pregunta |
+| SQL manual (`sql/NNN_*.sql`)| Control total, sin ORM                       | Hay que aplicarlos a mano en cada entorno |
+| JWT + pepper en env         | Sin servicio de secretos extra en el MVP     | Rotar pepper invalida claves |
+
+---
+
+## 10. Cómo se prueba
+
+```bash
+npm test
+```
+
+- Unitarias de dominio, use cases y adapters (con pool falso).
+- HTTP de integración contra `createMemoryApp()` (mismos controladores, repos en
+  memoria). No hace falta PostgreSQL para la suite.
+
+Los mensajes de aserción van en inglés; los `msg` de la API, en español.

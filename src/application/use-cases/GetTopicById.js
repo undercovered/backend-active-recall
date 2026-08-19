@@ -51,6 +51,7 @@ class GetTopicById {
 
     return {
       ...topic.toJSON(),
+      subjectTitle: subject.title,
       flashcard: hydrated[0] ?? null,
       flashcards: hydrated,
       recalls: recalls.map((r) => r.toJSON()),

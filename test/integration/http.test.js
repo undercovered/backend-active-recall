@@ -2,6 +2,7 @@ const { test, describe, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { createMemoryApp } = require('../helpers/createMemoryApp');
 const { request, todayIso } = require('../helpers/request');
+const { TOPIC_REVIEW_DUE_MSG } = require('../../src/application/topicReviewLock');
 
 describe('HTTP integration — envelope and unknown routes', () => {
   let app;
@@ -211,6 +212,125 @@ describe('HTTP integration — topics and answer types', () => {
     assert.equal(repos.recalls.length, 7);
   });
 
+  test('flashcards can be listed, added to a topic, updated and deleted', async () => {
+    const subjectId = await seedSubject();
+    const topic = await request(app, {
+      method: 'POST',
+      path: '/api/topics',
+      body: {
+        title: 'Loops',
+        subjectId,
+        questions: [
+          {
+            question: 'What is a for?',
+            answerTypeCode: 'open_answer',
+            answers: [{ answerText: 'repeating' }],
+          },
+        ],
+      },
+    });
+    const topicId = topic.body.data.id;
+
+    const listed = await request(app, { path: '/api/flashcards' });
+    assert.equal(listed.status, 200);
+    assert.equal(listed.body.data.length, 1);
+    assert.equal(listed.body.data[0].subjectTitle, 'Java');
+    assert.equal(listed.body.data[0].topicTitle, 'Loops');
+
+    const created = await request(app, {
+      method: 'POST',
+      path: '/api/flashcards',
+      body: {
+        topicId,
+        question: '2+2?',
+        answerTypeCode: 'single_choice',
+        answers: [
+          { answerText: '4', isCorrect: true },
+          { answerText: '5', isCorrect: false },
+        ],
+      },
+    });
+    assert.equal(created.status, 201);
+    assert.equal(created.body.data.topicId, topicId);
+    assert.equal(created.body.data.answers.length, 2);
+    const cardId = created.body.data.id;
+
+    const updated = await request(app, {
+      method: 'PUT',
+      path: `/api/flashcards/${cardId}`,
+      body: {
+        question: '3+3?',
+        answerTypeCode: 'open_answer',
+        answers: [{ answerText: '6' }],
+      },
+    });
+    assert.equal(updated.body.data.question, '3+3?');
+    assert.equal(updated.body.data.answers.length, 1);
+
+    const removed = await request(app, {
+      method: 'DELETE',
+      path: `/api/flashcards/${cardId}`,
+    });
+    assert.deepEqual(removed.body.data, { id: cardId });
+
+    const after = await request(app, { path: '/api/flashcards' });
+    assert.equal(after.body.data.length, 1);
+  });
+
+  test('flashcard mutations return 409 while the topic has a due review', async () => {
+    const subjectId = await seedSubject();
+    const topic = await request(app, {
+      method: 'POST',
+      path: '/api/topics',
+      body: {
+        title: 'Loops',
+        subjectId,
+        questions: [
+          {
+            question: 'What is a for?',
+            answerTypeCode: 'open_answer',
+            answers: [{ answerText: 'repeating' }],
+          },
+        ],
+      },
+    });
+    const topicId = topic.body.data.id;
+    const cardId = topic.body.data.flashcards[0].id;
+    repos.activeRecallRepository.makeDueToday(topicId, todayIso());
+
+    const due = await request(app, {
+      path: `/api/reviews/due-today?date=${todayIso()}`,
+    });
+    assert.deepEqual(due.body.data.topicIds, [topicId]);
+
+    const created = await request(app, {
+      method: 'POST',
+      path: '/api/flashcards',
+      body: {
+        topicId,
+        question: 'New?',
+        answerTypeCode: 'open_answer',
+        answers: [{ answerText: 'A' }],
+      },
+    });
+    assert.equal(created.status, 409);
+    assert.equal(created.body.code, 'TOPIC_REVIEW_DUE');
+    assert.equal(created.body.msg, TOPIC_REVIEW_DUE_MSG);
+
+    const updated = await request(app, {
+      method: 'PUT',
+      path: `/api/flashcards/${cardId}`,
+      body: { question: 'Changed?' },
+    });
+    assert.equal(updated.status, 409);
+
+    const removed = await request(app, {
+      method: 'DELETE',
+      path: `/api/flashcards/${cardId}`,
+    });
+    assert.equal(removed.status, 409);
+  });
+
   test('deleting a subject hides its topics, questions and due reviews', async () => {
     const subjectId = await seedSubject();
     const created = await request(app, {
@@ -318,6 +438,7 @@ describe('HTTP integration — reviews', () => {
     assert.equal(due.status, 200);
     assert.equal(due.body.data.hasPending, false);
     assert.equal(due.body.data.count, 0);
+    assert.deepEqual(due.body.data.topicIds, []);
 
     const session = await request(app, { path: `/api/reviews/session?date=${todayIso()}` });
     assert.equal(session.body.data.hasPending, false);
@@ -325,7 +446,7 @@ describe('HTTP integration — reviews', () => {
   });
 
   test('session hides isCorrect, grades choice, locks re-answer, grades open', async () => {
-    const { cards } = await seedDueTopic();
+    const { cards, topicId } = await seedDueTopic();
     const choice = cards.find((c) => c.answerType.code === 'single_choice');
     const open = cards.find((c) => c.answerType.code === 'open_answer');
     const correctId = choice.answers.find((a) => a.isCorrect).id;
@@ -334,6 +455,7 @@ describe('HTTP integration — reviews', () => {
     const due = await request(app, { path: `/api/reviews/due-today?date=${todayIso()}` });
     assert.equal(due.body.data.hasPending, true);
     assert.ok(due.body.data.count >= 1);
+    assert.deepEqual(due.body.data.topicIds, [topicId]);
 
     const session = await request(app, { path: `/api/reviews/session?date=${todayIso()}` });
     assert.equal(session.body.data.hasPending, true);

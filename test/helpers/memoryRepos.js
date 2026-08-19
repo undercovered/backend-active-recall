@@ -166,6 +166,33 @@ function createMemoryRepos() {
     async findAll() {
       return flashcards.filter((f) => alive(f) && topicTreeAlive(f.topicId));
     },
+    async findAllListed({ search, subjectId, topicId } = {}) {
+      const term = (search || '').trim().toLowerCase();
+      return flashcards
+        .filter((f) => {
+          if (!alive(f) || !topicTreeAlive(f.topicId)) return false;
+          if (subjectId && f.subjectId !== subjectId) return false;
+          if (topicId && f.topicId !== topicId) return false;
+          if (term && !f.question.toLowerCase().includes(term)) return false;
+          return true;
+        })
+        .map((f) => {
+          const topic = topics.find((t) => t.id === f.topicId);
+          const subject = subjects.find((s) => s.id === f.subjectId);
+          return {
+            id: f.id,
+            question: f.question,
+            topic_id: f.topicId,
+            subject_id: f.subjectId,
+            answer_type_id: f.answerTypeId,
+            deleted: f.deleted,
+            created_at: f.createdAt,
+            updated_at: f.updatedAt,
+            topic_title: topic?.title,
+            subject_title: subject?.title,
+          };
+        });
+    },
     async findByTopicId(topicId) {
       return flashcards.filter((f) => f.topicId === topicId && alive(f));
     },
@@ -194,10 +221,11 @@ function createMemoryRepos() {
       flashcards.push(f);
       return f;
     },
-    async update(fid, { question }) {
+    async update(fid, { question, answerTypeId }) {
       const f = flashcards.find((x) => x.id === fid && alive(x));
       if (!f) return null;
       if (question !== undefined) f.question = question;
+      if (answerTypeId !== undefined) f.answerTypeId = answerTypeId;
       return f;
     },
     async delete(fid) {
@@ -224,6 +252,13 @@ function createMemoryRepos() {
       const a = new Answer({ id: id('ans', answers), ...data });
       answers.push(a);
       return a;
+    },
+    async softDeleteByFlashcardId(flashcardId) {
+      answers
+        .filter((a) => a.flashcardId === flashcardId && alive(a))
+        .forEach((a) => {
+          a.deleted = true;
+        });
     },
   };
 

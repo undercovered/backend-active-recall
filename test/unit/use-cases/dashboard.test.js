@@ -12,6 +12,7 @@ describe('GetDashboardStats', () => {
       dueToday: 0,
       topicCount: 0,
       retentionRate: null,
+      subjects: [],
     });
   });
 
@@ -42,5 +43,63 @@ describe('GetDashboardStats', () => {
     const expected =
       Math.round(((100 + 100 * Math.exp(-1)) / 2) * 10) / 10;
     assert.equal(stats.retentionRate, expected);
+    assert.deepEqual(stats.subjects, [
+      { id: subject.id, dueToday: 0, inProgress: 0 },
+    ]);
+  });
+
+  test('counts in-progress questions until the topic completes 7 reviews', async () => {
+    const repos = createMemoryRepos();
+    const subject = await repos.subjectRepository.create({
+      title: 'Java',
+      description: null,
+    });
+    const topic = await repos.topicRepository.create({
+      title: 'Loops',
+      subjectId: subject.id,
+      createdAt: '2026-08-17',
+    });
+    await repos.flashcardRepository.create({
+      question: 'What is a loop?',
+      topicId: topic.id,
+      subjectId: subject.id,
+      answerTypeId: 'at-o',
+    });
+    await repos.flashcardRepository.create({
+      question: 'What is a while?',
+      topicId: topic.id,
+      subjectId: subject.id,
+      answerTypeId: 'at-o',
+    });
+    await repos.activeRecallRepository.createMany([
+      {
+        dateRecall: '2026-08-17',
+        topicId: topic.id,
+        subjectId: subject.id,
+      },
+    ]);
+
+    const before = await new GetDashboardStats(repos).execute({
+      date: '2026-08-17',
+    });
+    assert.deepEqual(before.subjects, [
+      { id: subject.id, dueToday: 2, inProgress: 2 },
+    ]);
+
+    await repos.activeRecallRepository.createMany(
+      Array.from({ length: 7 }, (_, i) => ({
+        dateRecall: `2026-01-0${i + 1}`,
+        completed: true,
+        topicId: topic.id,
+        subjectId: subject.id,
+      })),
+    );
+
+    const after = await new GetDashboardStats(repos).execute({
+      date: '2026-08-17',
+    });
+    assert.deepEqual(after.subjects, [
+      { id: subject.id, dueToday: 2, inProgress: 0 },
+    ]);
   });
 });

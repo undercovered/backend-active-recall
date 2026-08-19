@@ -17,6 +17,43 @@ class PgFlashcardRepository extends FlashcardRepository {
     return client ?? this.pool;
   }
 
+  async findAllListed({ search, subjectId, topicId } = {}) {
+    const term = typeof search === 'string' ? search.trim() : '';
+    const clauses = [
+      'f.deleted = false',
+      't.deleted = false',
+      's.deleted = false',
+    ];
+    const values = [];
+
+    if (subjectId) {
+      values.push(subjectId);
+      clauses.push(`f.subject_id = $${values.length}`);
+    }
+    if (topicId) {
+      values.push(topicId);
+      clauses.push(`f.topic_id = $${values.length}`);
+    }
+    if (term) {
+      values.push(`%${term}%`);
+      clauses.push(`f.question ILIKE $${values.length}`);
+    }
+
+    const { rows } = await this.pool.query(
+      `SELECT
+         f.*,
+         t.title AS topic_title,
+         s.title AS subject_title
+       FROM flashcards f
+       JOIN topics t ON t.id = f.topic_id
+       JOIN subjects s ON s.id = f.subject_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY f.created_at DESC`,
+      values,
+    );
+    return rows;
+  }
+
   async findAll() {
     const { rows } = await this.pool.query(
       `SELECT f.*
@@ -77,13 +114,14 @@ class PgFlashcardRepository extends FlashcardRepository {
     return Flashcard.fromRow(rows[0]);
   }
 
-  async update(id, { question }) {
-    const { rows } = await this.pool.query(
+  async update(id, { question, answerTypeId }, client) {
+    const { rows } = await this.db(client).query(
       `UPDATE flashcards
-       SET question = COALESCE($2, question)
+       SET question = COALESCE($2, question),
+           answer_type_id = COALESCE($3, answer_type_id)
        WHERE id = $1 AND deleted = false
        RETURNING *`,
-      [id, question ?? null],
+      [id, question ?? null, answerTypeId ?? null],
     );
     return rows[0] ? Flashcard.fromRow(rows[0]) : null;
   }

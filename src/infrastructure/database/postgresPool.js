@@ -9,16 +9,28 @@ const { Pool } = require('pg');
  * this module (and the adapters) without touching the domain.
  */
 
+function useSsl() {
+  const mode = String(process.env.PGSSLMODE || '').toLowerCase();
+  return (
+    mode === 'require' ||
+    mode === 'verify-full' ||
+    process.env.PGSSL === 'true' ||
+    process.env.PGSSL === '1'
+  );
+}
+
 const config = {
   host: process.env.PGHOST || 'localhost',
   port: Number(process.env.PGPORT) || 5432,
   user: process.env.PGUSER || 'postgres',
   password: process.env.PGPASSWORD || 'postgres',
   database: process.env.PGDATABASE || 'active_recall',
-  // Pool tuning
+  ssl: useSsl()
+    ? { rejectUnauthorized: process.env.PGSSL_REJECT_UNAUTHORIZED !== 'false' }
+    : undefined,
   max: Number(process.env.PGPOOL_MAX) || 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: Number(process.env.PGIDLE_TIMEOUT_MS) || 30000,
+  connectionTimeoutMillis: Number(process.env.PGCONNECTION_TIMEOUT_MS) || 5000,
 };
 
 const pool = new Pool(config);

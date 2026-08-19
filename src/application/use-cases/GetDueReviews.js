@@ -1,4 +1,5 @@
 const { resolveReviewDate } = require('../../domain/reviewDate');
+const { dueTopicIds } = require('../topicReviewLock');
 
 /**
  * How many reviews are due on (or before) the given local date
@@ -11,12 +12,16 @@ class GetDueReviews {
 
   async execute({ date } = {}) {
     const day = resolveReviewDate(date);
-    const { count, topicCount } = await this.activeRecallRepository.countDueOn(day);
+    const [{ count, topicCount }, topicIds] = await Promise.all([
+      this.activeRecallRepository.countDueOn(day),
+      dueTopicIds(this.activeRecallRepository, day),
+    ]);
     return {
       date: day,
       hasPending: count > 0,
       count,
       topicCount,
+      topicIds,
     };
   }
 }

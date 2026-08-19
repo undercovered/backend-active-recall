@@ -36,6 +36,11 @@ const GetTopicById = require('../application/use-cases/GetTopicById');
 const UpdateTopic = require('../application/use-cases/UpdateTopic');
 const DeleteTopic = require('../application/use-cases/DeleteTopic');
 const GetAllAnswerTypes = require('../application/use-cases/GetAllAnswerTypes');
+const GetAllFlashcards = require('../application/use-cases/GetAllFlashcards');
+const GetFlashcardById = require('../application/use-cases/GetFlashcardById');
+const CreateFlashcard = require('../application/use-cases/CreateFlashcard');
+const UpdateFlashcard = require('../application/use-cases/UpdateFlashcard');
+const DeleteFlashcard = require('../application/use-cases/DeleteFlashcard');
 const GetDueReviews = require('../application/use-cases/GetDueReviews');
 const GetDashboardStats = require('../application/use-cases/GetDashboardStats');
 const GetReviewSession = require('../application/use-cases/GetReviewSession');
@@ -85,11 +90,45 @@ const getTopicById = new GetTopicById({
 const updateTopic = new UpdateTopic({ topicRepository });
 const deleteTopic = new DeleteTopic({ topicRepository });
 const getAllAnswerTypes = new GetAllAnswerTypes({ answerTypeRepository });
+const getAllFlashcards = new GetAllFlashcards({
+  flashcardRepository,
+  answerRepository,
+  answerTypeRepository,
+});
+const getFlashcardById = new GetFlashcardById({
+  flashcardRepository,
+  topicRepository,
+  subjectRepository,
+  answerRepository,
+  answerTypeRepository,
+});
+const createFlashcard = new CreateFlashcard({
+  pool,
+  topicRepository,
+  subjectRepository,
+  flashcardRepository,
+  answerRepository,
+  answerTypeRepository,
+  activeRecallRepository,
+});
+const updateFlashcard = new UpdateFlashcard({
+  pool,
+  flashcardRepository,
+  topicRepository,
+  answerRepository,
+  answerTypeRepository,
+  activeRecallRepository,
+});
+const deleteFlashcard = new DeleteFlashcard({
+  flashcardRepository,
+  activeRecallRepository,
+});
 const getDueReviews = new GetDueReviews({ activeRecallRepository });
 const getDashboardStats = new GetDashboardStats({
   topicRepository,
   subjectRepository,
   activeRecallRepository,
+  flashcardRepository,
 });
 const getReviewSession = new GetReviewSession({
   activeRecallRepository,
@@ -140,6 +179,11 @@ module.exports = {
   updateTopic,
   deleteTopic,
   getAllAnswerTypes,
+  getAllFlashcards,
+  getFlashcardById,
+  createFlashcard,
+  updateFlashcard,
+  deleteFlashcard,
   getDueReviews,
   getDashboardStats,
   getReviewSession,

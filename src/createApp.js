@@ -40,6 +40,7 @@ function createApp() {
 
   app.use('/api/subjects', require('./interfaces/http/routes/subject.routes'));
   app.use('/api/topics', require('./interfaces/http/routes/topic.routes'));
+  app.use('/api/flashcards', require('./interfaces/http/routes/flashcard.routes'));
   app.use(
     '/api/answer-types',
     require('./interfaces/http/routes/answerType.routes'),

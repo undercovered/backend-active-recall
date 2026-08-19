@@ -19,6 +19,7 @@ describe('HTTP integration — dashboard', () => {
       dueToday: 0,
       topicCount: 0,
       retentionRate: null,
+      subjects: [],
     });
   });
 
@@ -42,5 +43,31 @@ describe('HTTP integration — dashboard', () => {
     assert.equal(res.body.data.topicCount, 1);
     assert.equal(res.body.data.dueToday, 0);
     assert.equal(res.body.data.retentionRate, 100);
+    assert.deepEqual(res.body.data.subjects, [
+      { id: subject.id, dueToday: 0, inProgress: 0 },
+    ]);
+  });
+
+  test('GET /api/dashboard/stats counts in-progress questions per subject', async () => {
+    const subject = await repos.subjectRepository.create({
+      title: 'Java',
+      description: null,
+    });
+    const topic = await repos.topicRepository.create({
+      title: 'Streams',
+      subjectId: subject.id,
+      createdAt: '2026-08-17',
+    });
+    await repos.flashcardRepository.create({
+      question: 'What is a stream?',
+      topicId: topic.id,
+      subjectId: subject.id,
+      answerTypeId: 'at-o',
+    });
+    const res = await request(app, { path: '/api/dashboard/stats?date=2026-08-17' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.data.subjects, [
+      { id: subject.id, dueToday: 0, inProgress: 1 },
+    ]);
   });
 });
